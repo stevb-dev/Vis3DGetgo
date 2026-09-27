@@ -1,0 +1,11 @@
+# Keeps the nginx image build context (repository root) small.
+node_modules
+**/node_modules
+**/dist
+.git
+.env
+backend/uploads
+backend/models
+.scratch
+docs
+*.md

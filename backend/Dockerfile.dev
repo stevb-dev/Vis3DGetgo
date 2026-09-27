@@ -1,0 +1,19 @@
+# Dev image: source is mounted from ./backend, tsx watch provides reload.
+# Debian-based image: Prisma engines need glibc + openssl 3 (Alpine/musl is unsupported).
+FROM node:20-slim
+
+WORKDIR /app
+
+# Prisma engine detection needs the openssl CLI (bookworm-slim omits it).
+RUN apt-get update -y \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+COPY prisma ./prisma
+RUN npx prisma generate
+
+EXPOSE 3000
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run dev"]

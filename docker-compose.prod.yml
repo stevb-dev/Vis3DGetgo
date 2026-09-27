@@ -1,0 +1,75 @@
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      - uploads:/var/www/uploads:ro
+      - models:/var/www/models:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - thesis-net
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-thesis}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      NODE_ENV: production
+      PORT: 3000
+      UPLOAD_DIR: /app/uploads
+      MODELS_DIR: /app/models
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-5}
+      SEED_ON_START: ${SEED_ON_START:-true}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin123!}
+    volumes:
+      - uploads:/app/uploads
+      - models:/app/models
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - thesis-net
+
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-thesis}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-thesis}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - thesis-net
+
+volumes:
+  postgres_data:
+  uploads:
+  models:
+
+networks:
+  thesis-net:
+    driver: bridge

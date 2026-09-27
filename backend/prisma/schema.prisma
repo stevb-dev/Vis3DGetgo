@@ -1,0 +1,81 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  username      String         @unique
+  password      String // bcrypt hash (per-password random salt embedded by bcrypt)
+  role          Role           @default(USER)
+  createdAt     DateTime       @default(now())
+  locations     Location[]
+  images        Image[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // SHA-256 of the opaque token; raw value only ever lives in the httpOnly cookie
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Location {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  latitude    Float
+  longitude   Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  userId Int?
+  user   User?  @relation(fields: [userId], references: [id])
+
+  model  Model?
+  images Image[]
+}
+
+model Model {
+  id         Int      @id @default(autoincrement())
+  locationId Int      @unique
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  filename  String // e.g., "eiffel-tower.glb"
+  filePath  String // e.g., "/models/eiffel-tower.glb"
+  fileSize  Int
+  createdAt DateTime @default(now())
+}
+
+model Image {
+  id           Int      @id @default(autoincrement())
+  locationId   Int
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  filename     String // e.g., "uuid.webp"
+  originalName String
+  filePath     String // e.g., "/uploads/uuid.webp"
+  fileSize     Int
+  mimeType     String
+  order        Int      @default(0) // carousel ordering
+  createdAt    DateTime @default(now())
+}

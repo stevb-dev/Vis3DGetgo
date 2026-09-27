@@ -1,0 +1,5 @@
+# Shell scripts must stay LF in the working tree — they run inside Linux containers.
+*.sh text eol=lf
+
+# Everything else: normalize line endings on commit.
+* text=auto

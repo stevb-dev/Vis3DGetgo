@@ -1,0 +1,16 @@
+# Dependencies & build output
+node_modules/
+dist/
+
+# Environment (real secrets)
+.env
+
+# Runtime data (Docker volume mount targets)
+backend/uploads/*
+backend/models/*
+!backend/uploads/.gitkeep
+!backend/models/.gitkeep
+
+# OS noise
+Thumbs.db
+.DS_Store

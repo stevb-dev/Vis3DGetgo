@@ -1,0 +1,100 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-thesis}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-thesis}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - thesis-net
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-thesis}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-secret}
+      NODE_ENV: development
+      PORT: 3000
+      UPLOAD_DIR: /app/uploads
+      MODELS_DIR: /app/models
+      COOKIE_SECURE: "false"
+      CORS_ORIGIN: http://localhost:5173
+      MAX_UPLOAD_MB: 5
+    volumes:
+      # Mount only source dirs — node_modules always comes from the Linux image
+      # (host node_modules contains Windows binaries and must not shadow it).
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+      - uploads:/app/uploads
+      - models:/app/models
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - thesis-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_API_URL: /api
+      VITE_USE_POLLING: "true"
+    volumes:
+      # Mount only editable files — node_modules always comes from the Linux image
+      # (host node_modules contains Windows binaries and must not shadow it).
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend/postcss.config.js:/app/postcss.config.js
+      - ./frontend/components.json:/app/components.json
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+    ports:
+      - "5173:5173"
+    networks:
+      - thesis-net
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - uploads:/var/www/uploads:ro
+      - models:/var/www/models:ro
+    depends_on:
+      - api
+      - frontend
+    networks:
+      - thesis-net
+
+volumes:
+  postgres_data:
+  uploads:
+  models:
+
+networks:
+  thesis-net:
+    driver: bridge
