@@ -87,9 +87,12 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
   // preserved scroll snap — a startIndex in opts would therefore jump the
   // carousel back to the originally-opened slide on every zoom toggle.
   // With no startIndex in opts, reInit keeps the current slide.
+  //
+  // scrollTo's second argument is `jump`: true = instant positioning
+  // (before paint — no flash, no slide-through animation).
   useLayoutEffect(() => {
     if (open && api && startIndex !== null) {
-      api.scrollTo(startIndex, false) // instant, before paint — no flash
+      api.scrollTo(startIndex, true)
     }
   }, [api, open, startIndex])
 
