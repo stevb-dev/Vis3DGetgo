@@ -150,7 +150,21 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogPortal>
         <DialogOverlay className="bg-black/90" />
-        <DialogPrimitive.Content className="fixed inset-0 z-[1001] flex flex-col items-center justify-center outline-none">
+        <DialogPrimitive.Content
+          className="fixed inset-0 z-[1001] flex flex-col items-center justify-center outline-none"
+          onEscapeKeyDown={(e) => e.preventDefault()} // Radix must not auto-dismiss — handled below
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape') return
+            // Close the lightbox HERE and consume the event. Radix would
+            // dismiss from a document-CAPTURE listener instead — by the time
+            // that event reached the sidebar's window-level Escape handler,
+            // React has already committed lightboxIndex = null, and the
+            // sidebar would close as well. stopPropagation keeps the event
+            // away from the window listener entirely.
+            e.stopPropagation()
+            onClose()
+          }}
+        >
           <DialogTitle className="sr-only">Image viewer — {location.name}</DialogTitle>
           <DialogDescription className="sr-only">
             Large view of the photos for {location.name}
