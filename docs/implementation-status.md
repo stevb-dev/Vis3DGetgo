@@ -115,6 +115,7 @@ Grilling-round design (2026-10-10): creation-order carousel (no reorder endpoint
 | Two tabs refreshing simultaneously revoked the whole session | Same cookie presented twice = theft signal | Single-flight + cross-tab lock |
 | API edits silently not applied in dev | `tsx watch` doesn't receive file-change events over Windows Docker bind mounts | Restart the container after backend edits (Vite already polls for the same reason) |
 | Lightbox: clicking while zoomed only recentered the image | The unzoom ran in native `pointerup`, but the browser's follow-up `click` saw the freshly re-rendered (fitted) closure and re-zoomed | Do the whole zoom toggle in the native `pointerup` handler; no React `onClick` |
+| Lightbox: opening on photo #1, the first click never zoomed (worked after navigating away and back) | The pointer-listener effect keyed on `[current, zoomed]` never re-ran when the dialog opened at index 0 — the component stays mounted while closed, so `current` was already 0 and the listeners that early-returned while closed were never attached | Add `open` to the effect's dependencies so it re-runs when the dialog opens |
 
 ## 7. Remaining open work
 

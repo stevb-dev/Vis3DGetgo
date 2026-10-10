@@ -79,6 +79,12 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
   // implement drag-to-pan ourselves. The zoom toggle lives entirely in
   // pointerup: a React onClick would fire right after an unzoom click's
   // re-render with the NEW (fitted) closure and immediately re-zoom.
+  //
+  // NOTE: `open` is a dependency. The component stays mounted while closed
+  // (renders null), and `current` is initialized to 0 — opening at index 0
+  // leaves `[current, zoomed]` unchanged, so without `open` the listeners
+  // early-returned while closed would never be attached (thumbnail=photo #1
+  // wouldn't zoom until navigating away and back).
   useEffect(() => {
     const el = slideRef.current
     if (!el) return
@@ -133,7 +139,7 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
       el.removeEventListener('pointerup', onUp)
       el.removeEventListener('pointercancel', onCancel)
     }
-  }, [current, zoomed])
+  }, [current, zoomed, open])
 
   if (!open) return null
 
