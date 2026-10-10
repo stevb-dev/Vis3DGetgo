@@ -28,3 +28,22 @@ export const nearbyQuerySchema = z.object({
   // Radius in meters; default 1000, capped at 50000.
   radius: z.coerce.number().min(1).max(50000).default(1000),
 })
+
+// ── Images / reports ────────────────────────────────────────────────────────
+
+export const REPORT_CATEGORIES = ['SPAM', 'INAPPROPRIATE', 'WRONG_LOCATION', 'BROKEN', 'OTHER'] as const
+
+export const reportBodySchema = z.object({
+  category: z.enum(REPORT_CATEGORIES),
+})
+
+export type ReportBody = z.infer<typeof reportBodySchema>
+
+export const resolveReportSchema = z.object({
+  status: z.enum(['OPEN', 'RESOLVED']),
+})
+
+// imageId: null clears the pin (thumbnail falls back to first-by-order).
+export const thumbnailPatchSchema = z.object({
+  imageId: z.number().int().positive().nullable(),
+})

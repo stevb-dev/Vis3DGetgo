@@ -6,6 +6,7 @@ import { config } from './lib/config'
 import authRoutes from './routes/auth'
 import locationRoutes from './routes/locations'
 import imageRoutes from './routes/images'
+import reportRoutes from './routes/reports'
 import modelRoutes from './routes/models'
 import { notFound, errorHandler } from './middleware/errorHandler'
 
@@ -24,6 +25,7 @@ export function createApp() {
   app.use('/api/auth', authRoutes)
   app.use('/api/locations', locationRoutes)
   app.use('/api', imageRoutes) // mounts /api/locations/:id/images and /api/images/:id
+  app.use('/api', reportRoutes) // mounts /api/images/:id/report, /api/locations/:id/report, /api/reports
   app.use('/api/models', modelRoutes)
 
   app.use(notFound)

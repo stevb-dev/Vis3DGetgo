@@ -4,9 +4,14 @@ import fs from 'fs'
 import path from 'path'
 import { prisma } from '../lib/prisma'
 import { config } from '../lib/config'
-import { createLocationSchema, nearbyQuerySchema, updateLocationSchema } from '../lib/schemas'
+import {
+  createLocationSchema,
+  nearbyQuerySchema,
+  thumbnailPatchSchema,
+  updateLocationSchema,
+} from '../lib/schemas'
 import { canModifyLocation } from '../lib/permissions'
-import { authenticate } from '../middleware/authenticate'
+import { authenticate, requireAdmin } from '../middleware/authenticate'
 
 const router = Router()
 
@@ -19,14 +24,15 @@ router.get('/', async (_req, res, next) => {
       include: {
         model: true,
         _count: { select: { images: true } },
-        // First image by carousel order — powers the map tooltip thumbnail.
+        // Admin-pinned thumbnail (if any) + first image by carousel order as fallback.
+        thumbnailImage: true,
         images: { orderBy: { order: 'asc' }, take: 1 },
       },
     })
     res.json({
-      locations: locations.map(({ images, ...loc }) => ({
+      locations: locations.map(({ images, thumbnailImage, ...loc }) => ({
         ...loc,
-        thumbnail: images[0] ?? null,
+        thumbnail: thumbnailImage ?? images[0] ?? null,
       })),
     })
   } catch (err) {
@@ -120,6 +126,42 @@ router.post('/', authenticate, async (req, res, next) => {
     })
 
     res.status(201).json({ location })
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid input', details: err.flatten() })
+    }
+    next(err)
+  }
+})
+
+// Admin-pinned carousel thumbnail (grilling decision: after the creator's
+// initial batch, only admins may change which image is the thumbnail).
+router.patch('/:id/thumbnail', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid id' })
+    }
+
+    const { imageId } = thumbnailPatchSchema.parse(req.body)
+
+    const location = await prisma.location.findUnique({ where: { id } })
+    if (!location) {
+      return res.status(404).json({ error: 'Location not found' })
+    }
+
+    if (imageId !== null) {
+      const image = await prisma.image.findFirst({ where: { id: imageId, locationId: id } })
+      if (!image) {
+        return res.status(400).json({ error: 'Image does not belong to this location' })
+      }
+    }
+
+    const updated = await prisma.location.update({
+      where: { id },
+      data: { thumbnailImageId: imageId },
+    })
+    res.json({ location: updated })
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: err.flatten() })

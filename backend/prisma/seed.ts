@@ -44,18 +44,45 @@ async function main() {
   })
   console.log(`[seed] admin user ready: ${admin.email}`)
 
+  // Demo persona (grilling decision): the seeded locations belong to a
+  // login-able ADMIN 'curator' account — demo@example.com / Demo123!.
+  // A USER role would be cosmetic anyway: the attached models block owners.
+  const demoEmail = process.env.SEED_DEMO_EMAIL ?? 'demo@example.com'
+  const demoPassword = process.env.SEED_DEMO_PASSWORD ?? 'Demo123!'
+
+  const demo = await prisma.user.upsert({
+    where: { email: demoEmail },
+    update: { role: 'ADMIN' },
+    create: {
+      email: demoEmail,
+      username: 'demo',
+      password: await bcrypt.hash(demoPassword, 12),
+      role: 'ADMIN',
+    },
+  })
+  console.log(`[seed] demo user ready: ${demo.email}`)
+
   for (const loc of demoLocations) {
     const existing = await prisma.location.findFirst({ where: { name: loc.name } })
-    if (existing) continue
-    await prisma.location.create({ data: loc })
+    if (existing) {
+      if (!existing.seeded || existing.userId !== demo.id) {
+        await prisma.location.update({
+          where: { id: existing.id },
+          data: { seeded: true, userId: demo.id },
+        })
+        console.log(`[seed] adopted location: ${loc.name}`)
+      }
+      continue
+    }
+    await prisma.location.create({ data: { ...loc, seeded: true, userId: demo.id } })
     console.log(`[seed] created location: ${loc.name}`)
   }
 
-  // The seed script owns the demo dataset (locations with userId = null).
+  // The seed script owns the demo dataset (rows flagged seeded = true).
   // Prune stale demo rows so the map matches this file.
   const demoNames = demoLocations.map((loc) => loc.name)
   const pruned = await prisma.location.deleteMany({
-    where: { userId: null, name: { notIn: demoNames } },
+    where: { seeded: true, name: { notIn: demoNames } },
   })
   if (pruned.count > 0) {
     console.log(`[seed] pruned ${pruned.count} stale demo location(s)`)

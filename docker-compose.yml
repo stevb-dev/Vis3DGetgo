@@ -31,6 +31,9 @@ services:
       COOKIE_SECURE: "false"
       CORS_ORIGIN: http://localhost:5173
       MAX_UPLOAD_MB: 5
+      MAX_IMAGES_PER_LOCATION: 200
+      SEED_DEMO_EMAIL: ${SEED_DEMO_EMAIL:-demo@example.com}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-Demo123!}
     volumes:
       # Mount only source dirs — node_modules always comes from the Linux image
       # (host node_modules contains Windows binaries and must not shadow it).

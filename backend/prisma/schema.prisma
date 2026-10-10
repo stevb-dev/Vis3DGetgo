@@ -14,6 +14,19 @@ enum Role {
   ADMIN
 }
 
+enum ReportCategory {
+  SPAM
+  INAPPROPRIATE
+  WRONG_LOCATION
+  BROKEN
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+}
+
 model User {
   id            Int            @id @default(autoincrement())
   email         String         @unique
@@ -23,6 +36,7 @@ model User {
   createdAt     DateTime       @default(now())
   locations     Location[]
   images        Image[]
+  reports       Report[]
   refreshTokens RefreshToken[]
 }
 
@@ -48,8 +62,18 @@ model Location {
   userId Int?
   user   User?  @relation(fields: [userId], references: [id])
 
-  model  Model?
-  images Image[]
+  // Seeded demo locations are owned by the seed's demo admin account
+  // (see prisma/seed.ts) and flagged so the UI can badge them distinctly.
+  seeded Boolean @default(false)
+
+  // Admin-pinned carousel thumbnail; null falls back to the first image by order.
+  // SetNull on image delete, so deleting the pinned image restores the fallback.
+  thumbnailImageId Int?   @unique
+  thumbnailImage   Image? @relation("LocationThumbnail", fields: [thumbnailImageId], references: [id], onDelete: SetNull)
+
+  model   Model?
+  images  Image[]
+  reports Report[]
 }
 
 model Model {
@@ -78,4 +102,24 @@ model Image {
   mimeType     String
   order        Int      @default(0) // carousel ordering
   createdAt    DateTime @default(now())
+
+  thumbnailOfLocation Location?  @relation("LocationThumbnail")
+  reports             Report[]
+}
+
+// A user report about junk content on an Image or a Location. Exactly one
+// target must be set (CHECK in the migration); uniqueness per reporter+target
+// is enforced by partial unique indexes (also in the migration).
+model Report {
+  id         Int            @id @default(autoincrement())
+  category   ReportCategory
+  status     ReportStatus   @default(OPEN)
+  imageId    Int?
+  image      Image?         @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  locationId Int?
+  location   Location?      @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  reporterId Int
+  reporter   User           @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedAt DateTime?
+  createdAt  DateTime       @default(now())
 }

@@ -17,4 +17,5 @@ export const config = {
   uploadDir: process.env.UPLOAD_DIR ?? 'uploads',
   modelsDir: process.env.MODELS_DIR ?? 'models',
   maxUploadMb: Number(process.env.MAX_UPLOAD_MB ?? 5),
+  maxImagesPerLocation: Number(process.env.MAX_IMAGES_PER_LOCATION ?? 200),
 } as const
