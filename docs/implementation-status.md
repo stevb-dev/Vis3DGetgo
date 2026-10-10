@@ -116,6 +116,7 @@ Grilling-round design (2026-10-10): creation-order carousel (no reorder endpoint
 | API edits silently not applied in dev | `tsx watch` doesn't receive file-change events over Windows Docker bind mounts | Restart the container after backend edits (Vite already polls for the same reason) |
 | Lightbox: clicking while zoomed only recentered the image | The unzoom ran in native `pointerup`, but the browser's follow-up `click` saw the freshly re-rendered (fitted) closure and re-zoomed | Do the whole zoom toggle in the native `pointerup` handler; no React `onClick` |
 | Lightbox: opening on photo #1, the first click never zoomed (worked after navigating away and back) | The pointer-listener effect keyed on `[current, zoomed]` never re-ran when the dialog opened at index 0 — the component stays mounted while closed, so `current` was already 0 and the listeners that early-returned while closed were never attached | Add `open` to the effect's dependencies so it re-runs when the dialog opens |
+| Lightbox: opening on the pinned thumbnail (any index) still wouldn't zoom on the first click | Listener attachment depended on ref-timing of a conditionally-attached slide ref (`ref={index === current ? slideRef : undefined}`) — on the opening commit the ref can point at the wrong slide or none, and nothing forces a re-attach | One capture-phase listener set on the always-mounted dialog content; the target slide is identified from the event via `[data-lightbox-slide]` — no ref-timing, works for every index |
 
 ## 7. Remaining open work
 
