@@ -2,7 +2,7 @@
 
 Session log of everything built so far — what is implemented, how it was verified, and what remains open. The thesis can cite this file directly as a build log.
 
-> Last updated: 2026-09-27 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
+> Last updated: 2026-10-10 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
 
 ---
 
@@ -65,7 +65,44 @@ Session log of everything built so far — what is implemented, how it was verif
 - **Map start**: browser geolocation when granted, else Skopje (`41.9973, 21.428`) — `hooks/useMapCenter.ts` + `Recenter` effect (react-leaflet ignores center changes after mount).
 - Design decisions: `docs/adr/0002-map-interaction-design.md` (grilling round).
 
-## 5. Bug ledger (root causes worth citing)
+## 5. Images, thumbnails & reports — `.scratch/images/` (4/4 resolved)
+
+Grilling-round design (2026-10-10): creation-order carousel (no reorder endpoint — it opened a thumbnail-hijack hole), admin-pinned thumbnails, creator picks the thumbnail on the initial batch, open uploads with report-to-admin moderation.
+
+### Upload pipeline (`routes/images.ts`, `lib/images.ts`)
+- `POST /api/locations/:id/images` — location check **before** multer (404), `upload.array('images', 10)` memory storage, filter JPEG/PNG/WebP, per-file `MAX_UPLOAD_MB` (5).
+- **All-or-nothing batches**: any invalid file → 400 with a clear message (MulterError mapping: size/count/type).
+- sharp: `rotate()` (EXIF orientation) → `resize(1200, 800, inside, no enlargement)` → WebP q85. EXIF metadata is stripped in the process (privacy).
+- `order = max + 1` computed in an interactive transaction under a `FOR UPDATE` row lock on the Location — concurrent uploads can't tie.
+- DB failure after write → fresh files unlinked (no orphans); `mkdir uploads` at boot.
+- **Caps & limits**: `MAX_IMAGES_PER_LOCATION` (200, env-tunable) → 400; per-user upload rate limit (20/10 min, keyed by JWT userId — IP keying would throttle NAT users).
+- **`thumbnailIndex`** (FormData): the location **creator** may designate one file of their **initial batch** as the pinned thumbnail (0 existing images, requester is owner or admin). Any later thumbnail change is admin-only.
+
+### Thumbnail pinning (ticket 02 outcome)
+- `Location.thumbnailImageId` nullable FK (SetNull on image delete) + `Location.seeded`.
+- `PATCH /api/locations/:id/thumbnail` — **admin-only**, `{ imageId | null }`; image must belong to the location (400 otherwise); `null` restores the first-by-order fallback. The list endpoint prefers the pin (`thumbnail = pinned ?? first`).
+
+### Delete (ticket 03)
+- Owner or admin, else **403 with a reason** (documented: existence is already public via the location detail endpoint). Row delete + sibling `order` shift down in one transaction (orders stay contiguous 1..N), then best-effort file unlink. Deleting the pinned thumbnail resets to the fallback via SetNull.
+
+### Reporting (grilling addition)
+- `Report` table: category enum (SPAM, INAPPROPRIATE, WRONG_LOCATION, BROKEN, OTHER), target = image **or** location (CHECK exactly-one), reporter (named — visible to admins only), status OPEN/RESOLVED; per-reporter-per-target uniqueness via **partial unique indexes** (raw SQL in the migration); cascade with the target.
+- `POST /api/images/:id/report` + `POST /api/locations/:id/report` (400 self-report, 409 duplicate), `GET /api/reports?status=` + `PATCH /api/reports/:id` (admin).
+
+### Demo dataset ownership (grilling addition)
+- The seed now creates a **demo curator account** (`SEED_DEMO_EMAIL/PASSWORD`, ADMIN role) that owns the 4 Skopje landmarks; `Location.seeded` drives the sidebar badge ("Pre-seeded demo location"). Pruning keys on `seeded` instead of `userId IS NULL`.
+
+### Frontend (ticket 04)
+- `ImageDropzone` (react-dropzone, guest log-in prompt, client pre-validation, star-per-file thumbnail picker for the creator's initial batch) + `ImageCarousel` (shadcn/embla — the WebP files are already the optimized size, no separate thumbnails).
+- Per-slide: delete (own/admin, confirm dialog), report (flag → category dialog), admin pin/unpin. Location report button in the sidebar header. Invalidation of `['location', id]` + `['locations']` after every mutation.
+- `AdminRoute` guard + minimal `/admin/reports` page (target, category, reporter, link to location, resolve) + header link for admins.
+
+### Tests & verification
+- **54 backend unit tests** (15 new): file filter, sharp transform (WebP magic, downscale box, no upscale), thumbnail-pick permission helper, report category + thumbnail schemas.
+- **Live E2E (HTTP)**: uploads (multi, pinned pick, open uploads, 400 type/no-files/out-of-range index, 404 location, 401, 429 rate limit), pinning (admin 200/403-nonadmin/400-foreign/clear+fallback), delete (owner 200, non-owner 403, admin 200, 404, contiguous orders), reports (201/409/400-self/400-category/403-nonadmin-list/resolve/resolvedAt), seed (seeded flag + demo ownership).
+- Frontend: `tsc` + vite build green; dev server boots clean. **Pending: interactive browser pass.**
+
+## 6. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -75,22 +112,25 @@ Session log of everything built so far — what is implemented, how it was verif
 | Create-location dialog invisible; clicks passed through to the map | Leaflet creates no stacking context (panes z ≤ 1000) vs dialog z-50 | Dialog overlay/content at z-[1000]/[1001] |
 | POST after silent refresh would 400 | 401-retry rebuilt headers without `Content-Type` | Re-attach on retry |
 | Two tabs refreshing simultaneously revoked the whole session | Same cookie presented twice = theft signal | Single-flight + cross-tab lock |
+| API edits silently not applied in dev | `tsx watch` doesn't receive file-change events over Windows Docker bind mounts | Restart the container after backend edits (Vite already polls for the same reason) |
 
-## 6. Remaining open work
+## 7. Remaining open work
 
-- `images` (0/4): multer+sharp upload pipeline, carousel ordering, delete/ownership, upload UI + carousel.
 - `models-3d` (0/3): admin registration API, sourcing demo GLBs (needs human), R3F viewer.
-- `frontend-map` 02 (partial): 3D viewer + carousel sections in the sidebar; 03 (partial): viewport persistence across reloads.
+- `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
+- Images: interactive browser pass of the carousel/dropzone/reports UI (build-verified only).
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 7. Doc map
+## 8. Doc map
 
 | Doc | Purpose |
 |---|---|
 | `THESIS_TECH_STACK.md` (v1.2) | Stack rationale, architecture, schema, flows — the thesis centerpiece |
 | `docs/adr/0001-auth-jwt-over-keycloak.md` | Why hand-rolled JWT, not Keycloak |
 | `docs/adr/0002-map-interaction-design.md` | Map UX decisions (sidebar, tooltips, locate) |
+| `docs/used-technologies.md` | Catalog of every technology used, grouped by layer |
+| `docs/technology-rationale.md` | Why each technology was selected and how the pieces correlate |
 | `CONTEXT.md` | Domain vocabulary |
 | `.scratch/README.md` | Tracker index (features → tickets → status) |
 | `docs/implementation-status.md` | This file |
