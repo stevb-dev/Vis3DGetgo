@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { Dialog, DialogOverlay, DialogPortal, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -81,6 +81,18 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
     }
   }, [api])
 
+  // Open at the clicked slide. Deliberately NOT the `startIndex` option:
+  // embla-react reInits when options change (the zoom toggle flips
+  // `watchDrag`), and reActivate merges the watched options OVER the
+  // preserved scroll snap — a startIndex in opts would therefore jump the
+  // carousel back to the originally-opened slide on every zoom toggle.
+  // With no startIndex in opts, reInit keeps the current slide.
+  useLayoutEffect(() => {
+    if (open && api && startIndex !== null) {
+      api.scrollTo(startIndex, false) // instant, before paint — no flash
+    }
+  }, [api, open, startIndex])
+
   function onSlidePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (zoomed) {
       // Own the gesture so drag-to-pan keeps receiving moves even off-slide.
@@ -149,7 +161,7 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
           <Carousel
             className="w-full"
             setApi={setApiState}
-            opts={{ startIndex: startIndex ?? 0, align: 'center', watchDrag: !zoomed }}
+            opts={{ align: 'center', watchDrag: !zoomed }}
           >
             <CarouselContent className="items-center">
               {images.map((image, index) => (
