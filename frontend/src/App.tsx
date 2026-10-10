@@ -2,12 +2,14 @@ import { Routes, Route } from 'react-router-dom'
 import Header from './components/Header'
 import GuestRoute from './components/GuestRoute'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import LocationSidebar from './components/LocationSidebar'
 import { Toaster } from './components/ui/sonner'
 import MapPage from './pages/MapPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import CreateLocationPage from './pages/CreateLocationPage'
+import AdminReportsPage from './pages/AdminReportsPage'
 
 export default function App() {
   return (
@@ -21,6 +23,10 @@ export default function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route path="/locations/new" element={<CreateLocationPage />} />
+        </Route>
+
+        <Route element={<AdminRoute />}>
+          <Route path="/admin/reports" element={<AdminReportsPage />} />
         </Route>
 
         {/* Map stays mounted; the location detail renders as a sidebar. */}

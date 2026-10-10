@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Pencil, Trash2, X } from 'lucide-react'
+import { Flag, Pencil, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, ApiError } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import { Location } from '@/lib/types'
+import { Location, ReportCategory } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -21,6 +21,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import ImageDropzone from '@/components/ImageDropzone'
+import ImageCarousel from '@/components/ImageCarousel'
+import ReportDialog from '@/components/ReportDialog'
 
 const updateSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
@@ -54,10 +57,23 @@ export default function LocationSidebar() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const form = useForm<UpdateValues>({
     resolver: zodResolver(updateSchema),
     defaultValues: { name: '', description: '' },
+  })
+
+  const reportMutation = useMutation({
+    mutationFn: (category: ReportCategory) =>
+      api.post<{ report: unknown }>(`/locations/${id}/report`, { category }),
+    onSuccess: () => {
+      setReportOpen(false)
+      toast.success('Reported — an administrator will review it')
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : 'Could not report the location')
+    },
   })
 
   const { data, isLoading, isError, error } = useQuery({
@@ -140,6 +156,17 @@ export default function LocationSidebar() {
               </Button>
             </>
           )}
+          {user && loc && loc.userId !== user.id && !editing && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Report location"
+              title="Report location"
+              onClick={() => setReportOpen(true)}
+            >
+              <Flag className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" aria-label="Close" onClick={() => navigate('/')}>
             <X className="h-4 w-4" />
           </Button>
@@ -158,7 +185,7 @@ export default function LocationSidebar() {
         <div className="space-y-5 p-4">
           <div className="space-y-1 text-sm">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {loc.userId ? 'User-created location' : 'Pre-seeded demo location'}
+              {loc.seeded ? 'Pre-seeded demo location' : 'User-created location'}
             </p>
 
             {editing ? (
@@ -232,8 +259,9 @@ export default function LocationSidebar() {
 
           <section>
             <h3 className="text-sm font-semibold">Images</h3>
-            <div className="mt-2 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-              Upload + carousel — tracked ticket (.scratch/images/issues/04-upload-ui-carousel.md)
+            <div className="mt-2 space-y-3">
+              <ImageDropzone location={loc} />
+              <ImageCarousel location={loc} />
             </div>
           </section>
         </div>
@@ -258,6 +286,14 @@ export default function LocationSidebar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        submitting={reportMutation.isPending}
+        targetLabel={loc?.name ?? 'location'}
+        onSubmit={reportMutation.mutate}
+      />
     </aside>
   )
 }

@@ -39,6 +39,11 @@ export default function Header() {
       <div className="flex items-center gap-3">
         {currentUser ? (
           <>
+            {currentUser.role === 'ADMIN' && (
+              <Link to="/admin/reports" className="text-sm text-muted-foreground hover:text-foreground">
+                Reports
+              </Link>
+            )}
             <Link to="/locations/new" className="text-sm text-muted-foreground hover:text-foreground">
               New location
             </Link>
