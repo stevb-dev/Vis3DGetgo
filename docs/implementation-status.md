@@ -95,6 +95,7 @@ Grilling-round design (2026-10-10): creation-order carousel (no reorder endpoint
 ### Frontend (ticket 04)
 - `ImageDropzone` (react-dropzone, guest log-in prompt, client pre-validation, star-per-file thumbnail picker for the creator's initial batch) + `ImageCarousel` (shadcn/embla — the WebP files are already the optimized size, no separate thumbnails).
 - Per-slide: delete (own/admin, confirm dialog), report (flag → category dialog), admin pin/unpin. Location report button in the sidebar header. Invalidation of `['location', id]` + `['locations']` after every mutation.
+- `ImageLightbox` — LMB on a carousel photo opens a full-screen Radix Dialog reusing the embla carousel (`startIndex` = clicked slide); caption `n / total · location`; click-to-toggle zoom (fit ↔ 2× fit) with drag-to-pan (edge-clamped) while zoomed; navigation resets the view; Escape closes the lightbox before the sidebar (state lifted).
 - `AdminRoute` guard + minimal `/admin/reports` page (target, category, reporter, link to location, resolve) + header link for admins.
 
 ### Tests & verification
