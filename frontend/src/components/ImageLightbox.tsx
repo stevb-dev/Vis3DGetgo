@@ -41,7 +41,6 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
   const [api, setApiState] = useState<CarouselApi | undefined>(undefined)
 
   const panRef = useRef({ x: 0, y: 0 })
-  const movedRef = useRef(false)
   const slideRef = useRef<HTMLDivElement | null>(null)
 
   const open = startIndex !== null
@@ -77,9 +76,9 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
   // Native pointer handling on the visible slide. When zoomed we must block
   // the pointerdown BEFORE it reaches embla's own native listeners (which sit
   // below React's root, so a synthetic stopPropagation is too late) and then
-  // implement drag-to-pan + click-to-unzoom ourselves. When fitted, the same
-  // listeners only record whether the gesture moved, so a swipe doesn't
-  // double as a zoom click.
+  // implement drag-to-pan ourselves. The zoom toggle lives entirely in
+  // pointerup: a React onClick would fire right after an unzoom click's
+  // re-render with the NEW (fitted) closure and immediately re-zoom.
   useEffect(() => {
     const el = slideRef.current
     if (!el) return
@@ -95,16 +94,12 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
       }
       start = { x: e.clientX, y: e.clientY, px: panRef.current.x, py: panRef.current.y }
       moved = false
-      movedRef.current = false
     }
     const onMove = (e: PointerEvent) => {
       if (!start) return
       const dx = e.clientX - start.x
       const dy = e.clientY - start.y
-      if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) {
-        moved = true
-        movedRef.current = true
-      }
+      if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) moved = true
       if (!zoomed || !moved) return
       // Clamp so the zoomed image edges never leave the frame.
       const maxX = (el.offsetWidth * (ZOOM_SCALE - 1)) / 2
@@ -115,7 +110,11 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
       setPan({ x, y })
     }
     const onUp = () => {
-      if (zoomed && start && !moved) resetView() // click while zoomed → back to fit
+      if (start && !moved) {
+        // Plain click/tap (no drag): toggle fit ↔ 2× fit.
+        if (zoomed) resetView()
+        else setZoomed(true)
+      }
       start = null
       setDragging(false)
     }
@@ -163,9 +162,6 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
                 <CarouselItem key={image.id} className="flex justify-center">
                   <div
                     ref={index === current ? slideRef : undefined}
-                    onClick={() => {
-                      if (!zoomed && !movedRef.current) setZoomed(true)
-                    }}
                     className={cn(
                       'h-fit w-fit max-h-[85vh] max-w-[92vw] select-none',
                       zoomed ? 'cursor-grab' : 'cursor-zoom-in',

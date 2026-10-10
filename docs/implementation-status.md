@@ -114,6 +114,7 @@ Grilling-round design (2026-10-10): creation-order carousel (no reorder endpoint
 | POST after silent refresh would 400 | 401-retry rebuilt headers without `Content-Type` | Re-attach on retry |
 | Two tabs refreshing simultaneously revoked the whole session | Same cookie presented twice = theft signal | Single-flight + cross-tab lock |
 | API edits silently not applied in dev | `tsx watch` doesn't receive file-change events over Windows Docker bind mounts | Restart the container after backend edits (Vite already polls for the same reason) |
+| Lightbox: clicking while zoomed only recentered the image | The unzoom ran in native `pointerup`, but the browser's follow-up `click` saw the freshly re-rendered (fitted) closure and re-zoomed | Do the whole zoom toggle in the native `pointerup` handler; no React `onClick` |
 
 ## 7. Remaining open work
 
