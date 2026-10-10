@@ -32,6 +32,14 @@ interface ImageLightboxProps {
  * location name), click-to-toggle zoom (fit ↔ 2× fit) with drag-to-pan,
  * navigation resets the zoom. Escape closes the lightbox only — the sidebar
  * gates its own Escape handler on this state.
+ *
+ * Gesture handling is plain React synthetic handlers on each slide — no
+ * native listeners, no capture-phase tricks, no ref timing. While zoomed,
+ * embla's drag watching is disabled via the `watchDrag` option (embla-react
+ * reInits on options change and preserves the selected slide — verified in
+ * its source: reActivate passes `selectedScrollSnap()` as the new
+ * `startIndex`), so the slide handlers own the gesture: drag pans, a click
+ * toggles the zoom.
  */
 export default function ImageLightbox({ location, images, startIndex, onClose }: ImageLightboxProps) {
   const [current, setCurrent] = useState(startIndex ?? 0)
@@ -41,7 +49,7 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
   const [api, setApiState] = useState<CarouselApi | undefined>(undefined)
 
   const panRef = useRef({ x: 0, y: 0 })
-  const contentRef = useRef<HTMLDivElement | null>(null)
+  const gestureRef = useRef<{ x: number; y: number; px: number; py: number; moved: boolean } | null>(null)
 
   const open = startIndex !== null
 
@@ -73,76 +81,53 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
     }
   }, [api])
 
-  // Native pointer handling, attached ONCE to the dialog content (which is
-  // guaranteed to exist whenever the dialog is open — no dependence on
-  // ref-timing of individual slides, which left the first-opened slide dead
-  // depending on its index). The target slide is identified from the event
-  // via [data-lightbox-slide].
-  //
-  // pointerdown is registered in the CAPTURE phase: it must see the event
-  // before embla's own native listeners (which sit below React's root, so a
-  // synthetic stopPropagation is too late), so a zoomed drag pans instead of
-  // swiping. The zoom toggle lives entirely in pointerup: a React onClick
-  // would fire right after an unzoom click's re-render with the NEW (fitted)
-  // closure and immediately re-zoom.
-  useEffect(() => {
-    const el = contentRef.current
-    if (!el) return
+  function onSlidePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (zoomed) {
+      // Own the gesture so drag-to-pan keeps receiving moves even off-slide.
+      e.currentTarget.setPointerCapture(e.pointerId)
+      setDragging(true)
+    }
+    gestureRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      px: panRef.current.x,
+      py: panRef.current.y,
+      moved: false,
+    }
+  }
 
-    let gesture: { slide: HTMLElement; x: number; y: number; px: number; py: number } | null = null
-    let moved = false
+  function onSlidePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const g = gestureRef.current
+    if (!g) return
+    const dx = e.clientX - g.x
+    const dy = e.clientY - g.y
+    if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) g.moved = true
+    if (!zoomed || !g.moved) return
+    // Clamp so the zoomed image edges never leave the frame.
+    const el = e.currentTarget
+    const maxX = (el.offsetWidth * (ZOOM_SCALE - 1)) / 2
+    const maxY = (el.offsetHeight * (ZOOM_SCALE - 1)) / 2
+    const x = Math.min(maxX, Math.max(-maxX, g.px + dx))
+    const y = Math.min(maxY, Math.max(-maxY, g.py + dy))
+    panRef.current = { x, y }
+    setPan({ x, y })
+  }
 
-    const onDown = (e: PointerEvent) => {
-      const target = e.target as Element | null
-      const slide = target?.closest?.('[data-lightbox-slide]') as HTMLElement | null
-      if (!slide) return
-      if (zoomed) {
-        e.stopPropagation() // embla never sees it → drag pans instead of swiping
-        el.setPointerCapture(e.pointerId)
-        setDragging(true)
-      }
-      gesture = { slide, x: e.clientX, y: e.clientY, px: panRef.current.x, py: panRef.current.y }
-      moved = false
+  function onSlidePointerUp() {
+    const g = gestureRef.current
+    gestureRef.current = null
+    if (g && !g.moved) {
+      // Plain click/tap (no drag): toggle fit ↔ 2× fit.
+      if (zoomed) resetView()
+      else setZoomed(true)
     }
-    const onMove = (e: PointerEvent) => {
-      if (!gesture) return
-      const dx = e.clientX - gesture.x
-      const dy = e.clientY - gesture.y
-      if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) moved = true
-      if (!zoomed || !moved) return
-      // Clamp so the zoomed image edges never leave the frame.
-      const maxX = (gesture.slide.offsetWidth * (ZOOM_SCALE - 1)) / 2
-      const maxY = (gesture.slide.offsetHeight * (ZOOM_SCALE - 1)) / 2
-      const x = Math.min(maxX, Math.max(-maxX, gesture.px + dx))
-      const y = Math.min(maxY, Math.max(-maxY, gesture.py + dy))
-      panRef.current = { x, y }
-      setPan({ x, y })
-    }
-    const onUp = () => {
-      if (gesture && !moved) {
-        // Plain click/tap (no drag): toggle fit ↔ 2× fit.
-        if (zoomed) resetView()
-        else setZoomed(true)
-      }
-      gesture = null
-      setDragging(false)
-    }
-    const onCancel = () => {
-      gesture = null
-      setDragging(false)
-    }
+    setDragging(false)
+  }
 
-    el.addEventListener('pointerdown', onDown, true) // capture — must beat embla
-    el.addEventListener('pointermove', onMove)
-    el.addEventListener('pointerup', onUp)
-    el.addEventListener('pointercancel', onCancel)
-    return () => {
-      el.removeEventListener('pointerdown', onDown, true)
-      el.removeEventListener('pointermove', onMove)
-      el.removeEventListener('pointerup', onUp)
-      el.removeEventListener('pointercancel', onCancel)
-    }
-  }, [open, zoomed])
+  function onSlidePointerCancel() {
+    gestureRef.current = null
+    setDragging(false)
+  }
 
   if (!open) return null
 
@@ -150,10 +135,7 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogPortal>
         <DialogOverlay className="bg-black/90" />
-        <DialogPrimitive.Content
-          ref={contentRef}
-          className="fixed inset-0 z-[1001] flex flex-col items-center justify-center outline-none"
-        >
+        <DialogPrimitive.Content className="fixed inset-0 z-[1001] flex flex-col items-center justify-center outline-none">
           <DialogTitle className="sr-only">Image viewer — {location.name}</DialogTitle>
           <DialogDescription className="sr-only">
             Large view of the photos for {location.name}
@@ -167,13 +149,16 @@ export default function ImageLightbox({ location, images, startIndex, onClose }:
           <Carousel
             className="w-full"
             setApi={setApiState}
-            opts={{ startIndex: startIndex ?? 0, align: 'center' }}
+            opts={{ startIndex: startIndex ?? 0, align: 'center', watchDrag: !zoomed }}
           >
             <CarouselContent className="items-center">
               {images.map((image, index) => (
                 <CarouselItem key={image.id} className="flex justify-center">
                   <div
-                    data-lightbox-slide
+                    onPointerDown={onSlidePointerDown}
+                    onPointerMove={onSlidePointerMove}
+                    onPointerUp={onSlidePointerUp}
+                    onPointerCancel={onSlidePointerCancel}
                     className={cn(
                       'h-fit w-fit max-h-[85vh] max-w-[92vw] select-none',
                       zoomed ? 'cursor-grab' : 'cursor-zoom-in',
