@@ -58,6 +58,8 @@ export default function LocationSidebar() {
   const [deleting, setDeleting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
+  // Lifted from the carousel so Escape can close the lightbox first.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const form = useForm<UpdateValues>({
     resolver: zodResolver(updateSchema),
@@ -83,16 +85,21 @@ export default function LocationSidebar() {
     retry: false,
   })
 
-  // Escape: cancel editing first, otherwise close the sidebar.
+  // Escape: close the lightbox first, then cancel editing, then the sidebar.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
-      if (editing) setEditing(false)
-      else navigate('/')
+      if (lightboxIndex !== null) {
+        setLightboxIndex(null)
+      } else if (editing) {
+        setEditing(false)
+      } else {
+        navigate('/')
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate, editing])
+  }, [navigate, editing, lightboxIndex])
 
   const loc = data?.location
   const permission = user && loc ? canModify(loc, user.id, user.role) : false
@@ -261,7 +268,11 @@ export default function LocationSidebar() {
             <h3 className="text-sm font-semibold">Images</h3>
             <div className="mt-2 space-y-3">
               <ImageDropzone location={loc} />
-              <ImageCarousel location={loc} />
+              <ImageCarousel
+                location={loc}
+                lightboxIndex={lightboxIndex}
+                onLightboxIndexChange={setLightboxIndex}
+              />
             </div>
           </section>
         </div>

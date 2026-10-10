@@ -16,15 +16,24 @@ import {
 } from '@/components/ui/dialog'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import ReportDialog from '@/components/ReportDialog'
+import ImageLightbox from '@/components/ImageLightbox'
+
+interface ImageCarouselProps {
+  location: Location
+  /** Lightbox open index (lifted to the sidebar so Escape closes it first). */
+  lightboxIndex: number | null
+  onLightboxIndexChange: (index: number | null) => void
+}
 
 /**
  * Image carousel for the location sidebar (ticket 04). Per-slide actions:
+ * - LMB on the photo opens the full-screen lightbox (ImageLightbox)
  * - delete (uploader or admin, confirm dialog)
  * - report (authenticated non-uploaders, category dialog)
  * - pin/unpin thumbnail (admin only — the creator's initial pick or the
  *   first-by-order fallback applies otherwise)
  */
-export default function ImageCarousel({ location }: { location: Location }) {
+export default function ImageCarousel({ location, lightboxIndex, onLightboxIndexChange }: ImageCarouselProps) {
   const user = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
 
@@ -101,7 +110,9 @@ export default function ImageCarousel({ location }: { location: Location }) {
                   src={image.filePath}
                   alt={`Photo ${index + 1} of ${location.name}`}
                   loading="lazy"
-                  className="h-48 w-full rounded-md border object-cover"
+                  title="View larger"
+                  onClick={() => onLightboxIndexChange(index)}
+                  className="h-48 w-full cursor-zoom-in rounded-md border object-cover"
                 />
                 {isPinned && (
                   <span className="absolute left-2 top-2 flex items-center gap-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">
@@ -187,6 +198,13 @@ export default function ImageCarousel({ location }: { location: Location }) {
         submitting={reportMutation.isPending}
         targetLabel={reportTarget ? `photo ${images.indexOf(reportTarget) + 1}` : ''}
         onSubmit={(category) => reportTarget && reportMutation.mutate({ id: reportTarget.id, category })}
+      />
+
+      <ImageLightbox
+        location={location}
+        images={images}
+        startIndex={lightboxIndex}
+        onClose={() => onLightboxIndexChange(null)}
       />
     </>
   )
