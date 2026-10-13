@@ -1,19 +1,17 @@
 import { useMemo, useState } from 'react'
 import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
+import { MapContainer, Marker, Tooltip, useMapEvents } from 'react-leaflet'
 import { api } from '@/lib/api'
 import { defaultIcon, selectedIcon } from '@/lib/leafletIcons'
 import { useMapCenter } from '@/hooks/useMapCenter'
 import { MapSizeFix, Recenter } from '@/components/mapEffects'
 import LocateButton from '@/components/LocateButton'
 import CategoryFilter from '@/components/CategoryFilter'
+import TileLayerController from '@/components/TileLayerController'
+import TileLayerSwitcher from '@/components/TileLayerSwitcher'
 import { isLocationCategory, LocationSummary } from '@/lib/types'
-
-// OSM tiles are used for light demo traffic (see the OSM tile usage policy —
-// an on-premise deployment would serve its own tile cache).
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+import { DEFAULT_LAYER_ID, getLayer, isTileLayerId, type TileLayerId } from '@/lib/tileLayers'
 
 /** Below this zoom (no category selected) the map collapses to nothing. */
 const ZOOM_GATE = 12
@@ -39,11 +37,15 @@ export default function MapPage() {
   const match = useMatch('/locations/:id')
   const selectedId = match ? Number(match.params.id) : null
 
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const fly = searchParams.get('fly') === '1'
 
   const rawCategory = searchParams.get('category')
   const activeCategory = isLocationCategory(rawCategory) ? rawCategory : null
+
+  const rawLayer = searchParams.get('layer')
+  const activeLayer = getLayer(isTileLayerId(rawLayer) ? rawLayer : DEFAULT_LAYER_ID)
+
   const [zoom, setZoom] = useState(13)
 
   const { data, isLoading, isError } = useQuery({
@@ -71,10 +73,26 @@ export default function MapPage() {
     [fly, selected?.latitude, selected?.longitude],
   )
 
-  // Preserve the active category filter across navigation. The transient `fly`
-  // hint is deliberately dropped — carrying it would re-center on every click.
+  // Preserve the active category filter + tile layer across navigation. The
+  // transient `fly` hint is deliberately dropped — carrying it would re-center.
   function navigateMap(path: string) {
-    navigate(activeCategory ? `${path}?category=${activeCategory}` : path)
+    const params = new URLSearchParams()
+    if (activeCategory) params.set('category', activeCategory)
+    if (activeLayer.id !== DEFAULT_LAYER_ID) params.set('layer', activeLayer.id)
+    const s = params.toString()
+    navigate(s ? `${path}?${s}` : path)
+  }
+
+  function selectLayer(id: TileLayerId) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (id === DEFAULT_LAYER_ID) next.delete('layer')
+        else next.set('layer', id)
+        return next
+      },
+      { replace: true },
+    )
   }
 
   function handleMarkerClick(locId: number) {
@@ -98,7 +116,7 @@ export default function MapPage() {
           scrollWheelZoom
           className="h-[calc(100vh-3.5rem)] w-full"
         >
-          <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
+          <TileLayerController layer={activeLayer} />
           <Recenter center={center} flyTo={flyTarget} />
           <MapSizeFix />
           <MapClickHandler onMapClick={handleMapClick} />
@@ -133,6 +151,9 @@ export default function MapPage() {
 
         {/* Category filter overlay (sits above the map, below the loading veil). */}
         <CategoryFilter />
+
+        {/* Tile layer switcher (bottom-left). */}
+        <TileLayerSwitcher activeId={activeLayer.id} onSelect={selectLayer} />
 
         {/* Empty state: no markers visible (below the gate with no filter, or an
             empty category). Non-interactive so pan/zoom still work. */}
