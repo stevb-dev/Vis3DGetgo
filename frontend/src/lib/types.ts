@@ -95,6 +95,17 @@ export interface LocationSummary {
   thumbnail: ImageRecord | null
 }
 
+/** Shape returned by GET /api/locations/search (search feature). */
+export interface SearchResult {
+  id: number
+  name: string
+  description: string | null
+  latitude: number
+  longitude: number
+  thumbnail: ImageRecord | null
+  similarity: number
+}
+
 // ── Reports ──────────────────────────────────────────────────────────────────
 
 export const REPORT_CATEGORIES = ['SPAM', 'INAPPROPRIATE', 'WRONG_LOCATION', 'BROKEN', 'OTHER'] as const

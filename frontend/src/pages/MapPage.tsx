@@ -8,6 +8,7 @@ import { useMapCenter } from '@/hooks/useMapCenter'
 import { MapSizeFix, Recenter } from '@/components/mapEffects'
 import LocateButton from '@/components/LocateButton'
 import CategoryFilter from '@/components/CategoryFilter'
+import SearchBox from '@/components/SearchBox'
 import TileLayerController from '@/components/TileLayerController'
 import TileLayerSwitcher from '@/components/TileLayerSwitcher'
 import { isLocationCategory, LocationSummary } from '@/lib/types'
@@ -149,7 +150,10 @@ export default function MapPage() {
           })}
         </MapContainer>
 
-        {/* Category filter overlay (sits above the map, below the loading veil). */}
+        {/* Search box (top-center, above the chips). */}
+        <SearchBox />
+
+        {/* Category filter overlay (below the search box). */}
         <CategoryFilter />
 
         {/* Tile layer switcher (bottom-left). */}

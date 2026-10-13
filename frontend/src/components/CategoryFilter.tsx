@@ -57,7 +57,7 @@ export default function CategoryFilter() {
   }
 
   return (
-    <div className="absolute left-1/2 top-3 z-[1000] w-[calc(100%-1.5rem)] max-w-2xl -translate-x-1/2">
+    <div className="absolute left-1/2 top-14 z-[1000] w-[calc(100%-1.5rem)] max-w-2xl -translate-x-1/2">
       <div className="relative">
         {canScrollLeft && (
           <button
