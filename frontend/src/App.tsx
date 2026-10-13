@@ -10,6 +10,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import CreateLocationPage from './pages/CreateLocationPage'
 import AdminReportsPage from './pages/AdminReportsPage'
+import SavedPage from './pages/SavedPage'
+import SlugResolver from './components/SlugResolver'
 
 export default function App() {
   return (
@@ -23,11 +25,15 @@ export default function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route path="/locations/new" element={<CreateLocationPage />} />
+          <Route path="/saved" element={<SavedPage />} />
         </Route>
 
         <Route element={<AdminRoute />}>
           <Route path="/admin/reports" element={<AdminReportsPage />} />
         </Route>
+
+        {/* Share-slug alias: resolves coords → canonical /locations/:id. */}
+        <Route path="/locations/:slug/:coords" element={<SlugResolver />} />
 
         {/* Map stays mounted; the location detail renders as a sidebar. */}
         <Route path="/" element={<MapPage />}>

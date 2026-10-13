@@ -17,7 +17,7 @@ docker compose up -d
 | URL | What |
 |-----|------|
 | `http://localhost` | Nginx entry point (SPA via Vite proxy in dev) |
-| `http://localhost:5173` | Vite dev server (HMR) |
+| `http://localhost:${FRONTEND_PORT:-5173}` | Vite dev server (HMR) |
 | `http://localhost:3000` | Express API (`/api/health`) |
 
 Migrations apply automatically on API start. Seed (admin user + demo locations):
@@ -45,6 +45,7 @@ Vite proxies `/api` → `localhost:3000`, `/uploads` and `/models` → `localhos
 
 - **Backend edits**: tsx's file watcher can miss changes on Windows→Docker bind mounts. If the API doesn't hot-reload, run `docker compose restart api`.
 - **Frontend edits**: Vite runs with polling (`VITE_USE_POLLING=true` in compose) so HMR is reliable inside the container.
+- **Port `5173` blocked**: Windows/Docker Desktop may reserve `5173` for Hyper-V NAT, so `docker compose up` fails with `ports are not available: ... 0.0.0.0:5173: bind: An attempt was made to access a socket in a way forbidden by its access permissions`. Work around it by setting `FRONTEND_PORT` in `.env` to a free port (e.g. `4173`). Check which ports Windows has reserved with `netsh interface ipv4 show excludedportrange protocol=tcp`.
 
 ## Production
 

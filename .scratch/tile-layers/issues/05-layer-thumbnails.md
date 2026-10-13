@@ -1,0 +1,21 @@
+# 05: Layer thumbnails
+
+Status: ready-for-agent
+Feature: tile-layers
+
+## Context
+
+Each menu item needs a small thumbnail. OpenTopoMap is raster (a real tile can
+be snapshotted); OpenFreeMap is vector with no static-image endpoint, so its
+three thumbnails must be representative bundled images.
+
+## Requirements
+
+- [ ] Add 4 PNGs under `frontend/public/layers/`: `liberty.png`, `bright.png`, `dark.png`, `topo.png` (small square-ish, e.g. ~64–96 px).
+- [ ] `topo.png` is a real OpenTopoMap tile — e.g. a tile around Skopje at z≈12 (`https://a.tile.opentopomap.org/12/2290/1520.png`).
+- [ ] The three OpenFreeMap thumbnails faithfully represent each style's look (render each style and capture, or source representative stills); record the provenance in a note here.
+
+## Notes
+
+- OpenFreeMap explicitly does not provide raster tiles or static image generation, so these can't be live `<img>` tile URLs — they must be bundled.
+- The OpenFreeMap previews are the soft spot of this feature: they are static approximations, not live tiles. Whatever images are used should be documented so a reviewer can verify they depict the right style.

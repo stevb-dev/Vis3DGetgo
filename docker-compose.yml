@@ -29,7 +29,7 @@ services:
       UPLOAD_DIR: /app/uploads
       MODELS_DIR: /app/models
       COOKIE_SECURE: "false"
-      CORS_ORIGIN: http://localhost:5173
+      CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-5173}
       MAX_UPLOAD_MB: 5
       MAX_IMAGES_PER_LOCATION: 200
       SEED_DEMO_EMAIL: ${SEED_DEMO_EMAIL:-demo@example.com}
@@ -75,7 +75,7 @@ services:
       - ./frontend/tsconfig.json:/app/tsconfig.json
       - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT:-5173}:5173"
     networks:
       - thesis-net
 

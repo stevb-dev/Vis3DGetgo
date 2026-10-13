@@ -10,10 +10,11 @@ import { defaultIcon } from '@/lib/leafletIcons'
 import { useMapCenter } from '@/hooks/useMapCenter'
 import { Recenter } from '@/components/mapEffects'
 import LocateButton from '@/components/LocateButton'
-import { Location } from '@/lib/types'
+import { Location, LOCATION_CATEGORIES, LOCATION_CATEGORY_LABELS } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Select } from '@/components/ui/select'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import {
   Dialog,
@@ -30,6 +31,7 @@ const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyrigh
 const formSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
   description: z.string().trim().max(500, 'Description is too long').optional().or(z.literal('')),
+  category: z.enum(LOCATION_CATEGORIES),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -56,7 +58,7 @@ export default function CreateLocationPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: '', description: '' },
+    defaultValues: { name: '', description: '', category: 'MONUMENTS' },
   })
 
   const mutation = useMutation({
@@ -67,6 +69,7 @@ export default function CreateLocationPage() {
         description: values.description || undefined,
         latitude: picked.lat,
         longitude: picked.lng,
+        category: values.category,
       })
     },
     onSuccess: (res) => {
@@ -151,6 +154,25 @@ export default function CreateLocationPage() {
                     <FormLabel>Description (optional)</FormLabel>
                     <FormControl>
                       <Textarea placeholder="What makes this place interesting?" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <Select {...field}>
+                        {LOCATION_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {LOCATION_CATEGORY_LABELS[cat]}
+                          </option>
+                        ))}
+                      </Select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

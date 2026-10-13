@@ -27,6 +27,20 @@ enum ReportStatus {
   RESOLVED
 }
 
+enum LocationCategory {
+  MUSEUMS
+  ART_GALLERIES
+  MONUMENTS
+  EDUCATION
+  ENTERTAINMENT
+  HEALTH
+  HOUSING
+  STORES
+  FINANCE
+  FOOD_AND_DRINK
+  NATURE
+}
+
 model User {
   id            Int            @id @default(autoincrement())
   email         String         @unique
@@ -38,6 +52,7 @@ model User {
   images        Image[]
   reports       Report[]
   refreshTokens RefreshToken[]
+  savedLocations SavedLocation[]
 }
 
 model RefreshToken {
@@ -66,6 +81,9 @@ model Location {
   // (see prisma/seed.ts) and flagged so the UI can badge them distinctly.
   seeded Boolean @default(false)
 
+  // Fixed category taxonomy (.scratch/sidebar-redesign/issues/01).
+  category LocationCategory @default(MONUMENTS)
+
   // Admin-pinned carousel thumbnail; null falls back to the first image by order.
   // SetNull on image delete, so deleting the pinned image restores the fallback.
   thumbnailImageId Int?   @unique
@@ -74,6 +92,7 @@ model Location {
   model   Model?
   images  Image[]
   reports Report[]
+  savedBy SavedLocation[]
 }
 
 model Model {
@@ -93,7 +112,7 @@ model Image {
   location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   userId Int
-  user   User @relation(fields: [userId], references: [id])
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   filename     String // e.g., "uuid.webp"
   originalName String
@@ -122,4 +141,16 @@ model Report {
   reporter   User           @relation(fields: [reporterId], references: [id], onDelete: Cascade)
   resolvedAt DateTime?
   createdAt  DateTime       @default(now())
+}
+
+// Per-user bookmark of a Location (sidebar-redesign ticket 03).
+model SavedLocation {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  locationId Int
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, locationId])
 }

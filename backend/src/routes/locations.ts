@@ -7,8 +7,10 @@ import { config } from '../lib/config'
 import {
   createLocationSchema,
   nearbyQuerySchema,
+  resolveQuerySchema,
   thumbnailPatchSchema,
   updateLocationSchema,
+  type LocationCategory,
 } from '../lib/schemas'
 import { canModifyLocation } from '../lib/permissions'
 import { authenticate, requireAdmin } from '../middleware/authenticate'
@@ -82,6 +84,45 @@ router.get('/nearby', async (req, res, next) => {
     `
 
     res.json({ locations: rows })
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: err.flatten() })
+    }
+    next(err)
+  }
+})
+
+// Share-slug resolution (.scratch/sidebar-redesign/issues/04): find the
+// nearest location to the coords carried in the slug. Truncation to 5 decimals
+// is ≤ ~1 m, so a 25 m radius is ample headroom without ambiguity between the
+// demo landmarks.
+router.get('/resolve', async (req, res, next) => {
+  try {
+    const { lat, lng } = resolveQuerySchema.parse(req.query)
+
+    interface ResolveRow {
+      id: number
+    }
+
+    const rows = await prisma.$queryRaw<ResolveRow[]>`
+      SELECT l.id
+      FROM "Location" l
+      WHERE ST_DWithin(
+        ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
+        ST_SetSRID(ST_MakePoint(l.longitude, l.latitude), 4326)::geography,
+        ${25}
+      )
+      ORDER BY ST_Distance(
+        ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
+        ST_SetSRID(ST_MakePoint(l.longitude, l.latitude), 4326)::geography
+      ) ASC
+      LIMIT 1
+    `
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Location not found' })
+    }
+    res.json({ id: rows[0].id })
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid query parameters', details: err.flatten() })
@@ -193,9 +234,10 @@ router.patch('/:id', authenticate, async (req, res, next) => {
       return res.status(403).json({ error: permission.reason ?? 'Forbidden' })
     }
 
-    const data: { name?: string; description?: string | null } = {}
+    const data: { name?: string; description?: string | null; category?: LocationCategory } = {}
     if (body.name !== undefined) data.name = body.name
     if (body.description !== undefined) data.description = body.description
+    if (body.category !== undefined) data.category = body.category
 
     const updated = await prisma.location.update({ where: { id }, data })
     res.json({ location: updated })

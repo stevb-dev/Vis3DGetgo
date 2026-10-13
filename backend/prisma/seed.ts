@@ -1,30 +1,43 @@
 import bcrypt from 'bcrypt'
+import { LocationCategory } from '@prisma/client'
 import { prisma } from '../src/lib/prisma'
 
-const demoLocations = [
+interface DemoLocation {
+  name: string
+  description: string
+  latitude: number
+  longitude: number
+  category: LocationCategory
+}
+
+const demoLocations: DemoLocation[] = [
   {
     name: 'Macedonia Square',
     description: 'Central square of Skopje — seed demo location.',
     latitude: 41.9965,
     longitude: 21.4313,
+    category: LocationCategory.MONUMENTS,
   },
   {
     name: 'Skopje Fortress (Kale)',
     description: 'Fortress hill above the old bazaar — seed demo location.',
     latitude: 42.0001,
     longitude: 21.4323,
+    category: LocationCategory.MONUMENTS,
   },
   {
     name: 'Stone Bridge',
     description: 'Ottoman-era bridge over the Vardar — seed demo location.',
     latitude: 41.9961,
     longitude: 21.4326,
+    category: LocationCategory.MONUMENTS,
   },
   {
     name: 'Matka Canyon',
     description: 'Canyon and lake west of Skopje — seed demo location.',
     latitude: 41.9416,
     longitude: 21.3015,
+    category: LocationCategory.NATURE,
   },
 ]
 
@@ -65,10 +78,10 @@ async function main() {
   for (const loc of demoLocations) {
     const existing = await prisma.location.findFirst({ where: { name: loc.name } })
     if (existing) {
-      if (!existing.seeded || existing.userId !== demo.id) {
+      if (!existing.seeded || existing.userId !== demo.id || existing.category !== loc.category) {
         await prisma.location.update({
           where: { id: existing.id },
-          data: { seeded: true, userId: demo.id },
+          data: { seeded: true, userId: demo.id, category: loc.category },
         })
         console.log(`[seed] adopted location: ${loc.name}`)
       }

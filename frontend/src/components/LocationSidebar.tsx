@@ -1,17 +1,19 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Flag, Pencil, Trash2, X } from 'lucide-react'
+import { Bookmark, Flag, Pencil, Share2, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, ApiError } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import { Location, ReportCategory } from '@/lib/types'
+import { LOCATION_CATEGORIES, LOCATION_CATEGORY_LABELS, Location, ReportCategory } from '@/lib/types'
+import { cn, buildShareUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Select } from '@/components/ui/select'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import {
   Dialog,
@@ -28,6 +30,7 @@ import ReportDialog from '@/components/ReportDialog'
 const updateSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
   description: z.string().trim().max(500, 'Description is too long').optional().or(z.literal('')),
+  category: z.enum(LOCATION_CATEGORIES),
 })
 
 type UpdateValues = z.infer<typeof updateSchema>
@@ -43,6 +46,35 @@ function canModify(loc: Location, userId: number, role: 'USER' | 'ADMIN'): boole
   return loc.images.every((img) => img.userId === userId)
 }
 
+/** Description subtitle: 2-line clamp with a measured "Show more"/"Show less". */
+function ClampedText({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+  const ref = useRef<HTMLParagraphElement>(null)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (el) setOverflowing(el.scrollHeight > el.clientHeight + 1)
+  }, [text])
+
+  return (
+    <div className="min-w-0">
+      <p ref={ref} className={cn('text-xs text-muted-foreground', !expanded && 'line-clamp-2')}>
+        {text}
+      </p>
+      {overflowing && (
+        <button
+          type="button"
+          className="text-xs text-primary hover:underline"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 /**
  * Side panel shown next to the map at /locations/:id (nested under the map
  * route, so the map stays mounted and visible).
@@ -50,6 +82,7 @@ function canModify(loc: Location, userId: number, role: 'USER' | 'ADMIN'): boole
 export default function LocationSidebar() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const routeLocation = useLocation()
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
 
@@ -63,7 +96,7 @@ export default function LocationSidebar() {
 
   const form = useForm<UpdateValues>({
     resolver: zodResolver(updateSchema),
-    defaultValues: { name: '', description: '' },
+    defaultValues: { name: '', description: '', category: 'MONUMENTS' },
   })
 
   const reportMutation = useMutation({
@@ -83,6 +116,25 @@ export default function LocationSidebar() {
     queryFn: () => api.get<{ location: Location }>(`/locations/${id}`),
     enabled: !!id,
     retry: false,
+  })
+
+  // Bookmark state is per-user, so it only fetches when logged in.
+  const { data: savedData } = useQuery({
+    queryKey: ['location', id, 'saved'],
+    queryFn: () => api.get<{ saved: boolean }>(`/locations/${id}/save`),
+    enabled: !!id && !!user,
+  })
+  const isSaved = savedData?.saved ?? false
+
+  const saveMutation = useMutation({
+    mutationFn: () => api.post<{ saved: boolean }>(`/locations/${id}/save`),
+    onSuccess: (res) => {
+      queryClient.setQueryData(['location', id, 'saved'], { saved: res.saved })
+      queryClient.invalidateQueries({ queryKey: ['saved'] })
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update bookmark')
+    },
   })
 
   // Escape: close the lightbox first, then cancel editing, then the sidebar.
@@ -106,7 +158,7 @@ export default function LocationSidebar() {
 
   function startEdit() {
     if (!loc) return
-    form.reset({ name: loc.name, description: loc.description ?? '' })
+    form.reset({ name: loc.name, description: loc.description ?? '', category: loc.category })
     setEditError(null)
     setEditing(true)
   }
@@ -118,6 +170,7 @@ export default function LocationSidebar() {
       await api.patch<{ location: Location }>(`/locations/${loc.id}`, {
         name: values.name,
         description: values.description || null,
+        category: values.category,
       })
       setEditing(false)
       queryClient.invalidateQueries({ queryKey: ['location', id] })
@@ -125,6 +178,27 @@ export default function LocationSidebar() {
       toast.success('Location updated')
     } catch (err) {
       setEditError(err instanceof ApiError ? err.message : 'Something went wrong')
+    }
+  }
+
+  function handleSave() {
+    if (!loc) return
+    // Guests see the button; clicking prompts log-in (matches ImageDropzone).
+    if (!user) {
+      navigate('/login', { state: { from: routeLocation.pathname } })
+      return
+    }
+    saveMutation.mutate()
+  }
+
+  async function handleShare() {
+    if (!loc) return
+    const url = buildShareUrl(loc.name, loc.latitude, loc.longitude)
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Link copied to clipboard')
+    } catch {
+      toast.error('Could not copy the link')
     }
   }
 
@@ -144,39 +218,67 @@ export default function LocationSidebar() {
 
   return (
     <aside className="flex h-[calc(100vh-3.5rem)] w-96 shrink-0 flex-col overflow-y-auto border-l bg-card">
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b bg-card/95 px-4 py-3 backdrop-blur">
-        <h2 className="truncate text-sm font-semibold">{loc?.name ?? 'Location'}</h2>
-        <div className="flex items-center gap-1">
-          {permission && !editing && (
-            <>
-              <Button variant="ghost" size="icon" aria-label="Edit location" title="Edit location" onClick={startEdit}>
-                <Pencil className="h-4 w-4" />
-              </Button>
+      <div className="sticky top-0 z-10 border-b bg-card/95 px-4 py-3 backdrop-blur">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold">{loc?.name ?? 'Location'}</h2>
+            {loc && !editing && loc.description && <ClampedText text={loc.description} />}
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {loc && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={isSaved ? 'Unsave location' : 'Save location'}
+                  title={isSaved ? 'Unsave' : 'Save'}
+                  disabled={saveMutation.isPending}
+                  onClick={handleSave}
+                >
+                  <Bookmark className={cn('h-4 w-4', isSaved && 'fill-current')} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Share location"
+                  title="Copy share link"
+                  onClick={handleShare}
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            {permission && !editing && (
+              <>
+                <Button variant="ghost" size="icon" aria-label="Edit location" title="Edit location" onClick={startEdit}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Delete location"
+                  title="Delete location"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            {user && loc && loc.userId !== user.id && !editing && (
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Delete location"
-                title="Delete location"
-                onClick={() => setDeleteOpen(true)}
+                aria-label="Report location"
+                title="Report location"
+                onClick={() => setReportOpen(true)}
               >
-                <Trash2 className="h-4 w-4" />
+                <Flag className="h-4 w-4" />
               </Button>
-            </>
-          )}
-          {user && loc && loc.userId !== user.id && !editing && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Report location"
-              title="Report location"
-              onClick={() => setReportOpen(true)}
-            >
-              <Flag className="h-4 w-4" />
+            )}
+            <Button variant="ghost" size="icon" aria-label="Close" onClick={() => navigate('/')}>
+              <X className="h-4 w-4" />
             </Button>
-          )}
-          <Button variant="ghost" size="icon" aria-label="Close" onClick={() => navigate('/')}>
-            <X className="h-4 w-4" />
-          </Button>
+          </div>
         </div>
       </div>
 
@@ -190,91 +292,97 @@ export default function LocationSidebar() {
 
       {loc && (
         <div className="space-y-5 p-4">
-          <div className="space-y-1 text-sm">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {loc.seeded ? 'Pre-seeded demo location' : 'User-created location'}
-            </p>
-
-            {editing ? (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(saveEdit)} className="space-y-3" noValidate>
-                  {editError && (
-                    <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-                      {editError}
-                    </p>
+          {editing ? (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(saveEdit)} className="space-y-3" noValidate>
+                {editError && (
+                  <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+                    {editError}
+                  </p>
+                )}
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea rows={4} {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" size="sm" disabled={form.formState.isSubmitting}>
-                      {form.formState.isSubmitting ? 'Saving…' : 'Save'}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            ) : (
-              <>
-                {loc.description && <p>{loc.description}</p>}
-                <p className="text-muted-foreground">
-                  {loc.latitude.toFixed(5)}, {loc.longitude.toFixed(5)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Created {new Date(loc.createdAt).toLocaleString()}
-                  {loc.updatedAt !== loc.createdAt &&
-                    ` · Updated ${new Date(loc.updatedAt).toLocaleString()}`}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {loc.images.length} image{loc.images.length === 1 ? '' : 's'}
-                </p>
-              </>
-            )}
-          </div>
-
-          <section>
-            <h3 className="text-sm font-semibold">3D model</h3>
-            <div className="mt-2 flex min-h-48 items-center justify-center rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-              Viewer — tracked ticket (.scratch/models-3d/issues/03-r3f-viewer-component.md)
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea rows={4} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <FormControl>
+                        <Select {...field}>
+                          {LOCATION_CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {LOCATION_CATEGORY_LABELS[cat]}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" size="sm" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                {LOCATION_CATEGORY_LABELS[loc.category]}
+              </span>
             </div>
-          </section>
+          )}
 
           <section>
             <h3 className="text-sm font-semibold">Images</h3>
             <div className="mt-2 space-y-3">
-              <ImageDropzone location={loc} />
               <ImageCarousel
                 location={loc}
                 lightboxIndex={lightboxIndex}
                 onLightboxIndexChange={setLightboxIndex}
               />
+              <ImageDropzone location={loc} />
             </div>
           </section>
+
+          {loc.model && (
+            <section>
+              <h3 className="text-sm font-semibold">3D model</h3>
+              <div className="mt-2 flex min-h-[320px] items-center justify-center rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+                Viewer — tracked ticket (.scratch/models-3d/issues/03-r3f-viewer-component.md)
+              </div>
+            </section>
+          )}
         </div>
       )}
 

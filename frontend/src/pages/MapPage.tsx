@@ -1,4 +1,5 @@
-import { Outlet, useMatch, useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
+import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
 import { api } from '@/lib/api'
@@ -26,10 +27,21 @@ export default function MapPage() {
   const match = useMatch('/locations/:id')
   const selectedId = match ? Number(match.params.id) : null
 
+  const [searchParams] = useSearchParams()
+  const fly = searchParams.get('fly') === '1'
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['locations'],
     queryFn: () => api.get<{ locations: LocationSummary[] }>('/locations'),
   })
+
+  const selected = data?.locations.find((loc) => loc.id === selectedId)
+
+  // Memoized so FlyTo only reacts to the target coords changing, not re-renders.
+  const flyTarget = useMemo(
+    () => (fly && selected ? ([selected.latitude, selected.longitude] as [number, number]) : null),
+    [fly, selected?.latitude, selected?.longitude],
+  )
 
   function handleMarkerClick(locId: number) {
     // Clicking the already-selected marker toggles the sidebar closed.
@@ -50,7 +62,7 @@ export default function MapPage() {
         className="relative h-[calc(100vh-3.5rem)] min-w-0 flex-1"
       >
         <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
-        <Recenter center={center} />
+        <Recenter center={center} flyTo={flyTarget} />
         <MapSizeFix />
         <MapClickHandler onMapClick={handleMapClick} />
         <LocateButton />

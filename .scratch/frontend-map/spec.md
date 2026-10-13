@@ -14,3 +14,4 @@ Leaflet map with markers for all locations, click → detail split pane, selecte
 - `02-location-detail-split-pane.md`
 - `03-map-state-and-routing.md`
 - `04-locate-me-button.md`
+- `05-map-zoom-and-marker-icons.md`

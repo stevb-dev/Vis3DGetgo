@@ -47,6 +47,9 @@ export default function Header() {
             <Link to="/locations/new" className="text-sm text-muted-foreground hover:text-foreground">
               New location
             </Link>
+            <Link to="/saved" className="text-sm text-muted-foreground hover:text-foreground">
+              Saved
+            </Link>
             <span className="flex items-center gap-2 text-sm text-muted-foreground">
               {currentUser.username}
               {currentUser.role === 'ADMIN' && (

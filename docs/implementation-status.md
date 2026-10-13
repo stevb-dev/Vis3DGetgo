@@ -2,7 +2,7 @@
 
 Session log of everything built so far — what is implemented, how it was verified, and what remains open. The thesis can cite this file directly as a build log.
 
-> Last updated: 2026-10-10 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
+> Last updated: 2026-10-13 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
 
 ---
 
@@ -103,7 +103,36 @@ Grilling-round design (2026-10-10): creation-order carousel (no reorder endpoint
 - **Live E2E (HTTP)**: uploads (multi, pinned pick, open uploads, 400 type/no-files/out-of-range index, 404 location, 401, 429 rate limit), pinning (admin 200/403-nonadmin/400-foreign/clear+fallback), delete (owner 200, non-owner 403, admin 200, 404, contiguous orders), reports (201/409/400-self/400-category/403-nonadmin-list/resolve/resolvedAt), seed (seeded flag + demo ownership).
 - Frontend: `tsc` + vite build green; dev server boots clean. **Pending: interactive browser pass.**
 
-## 6. Bug ledger (root causes worth citing)
+## 6. Sidebar redesign — `.scratch/sidebar-redesign/` (4/4 resolved)
+
+Grilling-round design (2026-10-11, extended 2026-10-13): reorder the sidebar, add a location category, a Save/bookmark feature with a `/saved` page, and a share-slug URL.
+
+### Category (`issues/01`)
+- `LocationCategory` enum (11 values — NATURE added 2026-10-13 so Matka Canyon is honestly labeled) + non-null `Location.category` with `MONUMENTS` backfill (migration `20261013000000_location_category_saved_location`).
+- Create requires `category`; `PATCH /api/locations/:id` accepts it; list + detail return it. Seed: MONUMENTS for Square/Fortress/Stone Bridge, NATURE for Matka Canyon.
+- Fixed a pre-existing schema drift: `Image.user` now declares `onDelete: Cascade` to match the committed init migration (no DB change).
+
+### Sidebar reorder & meta (`issues/02`)
+- `LocationSidebar.tsx` reordered: header (title + clamped description subtitle + actions) → meta (badge + category label) → images (carousel above dropzone) → 3D model (tall hero, hidden when `model` is null).
+- Description is a 2-line clamp with a measured Show more/less toggle; coords/timestamps/image-count dropped from the meta block. New native `ui/select.tsx` for the category picker in the create + edit forms.
+
+### Save/bookmark (`issues/03`)
+- `SavedLocation` (unique user+location pair, cascade). `GET/POST /api/locations/:id/save` (read/toggle) + `GET /api/saved/locations` (list, thumbnail-enriched). Toggle returns the new `{ saved }`, handles the P2002 double-save race.
+- Bookmark button in the header (filled when saved, guests → log-in); `pages/SavedPage.tsx` (protected) card list with Unsave + empty state; cards link with `?fly=1`.
+
+### Share + slug (`issues/04`)
+- `slugifyName` helper; Share button copies `/locations/<slug>/@<lat>,<lng>` (coords at 5-decimal precision) + toast.
+- `GET /api/locations/resolve?lat=&lng=` → nearest within 25 m (`ST_DWithin`), 404 when none. `SlugResolver` route `/locations/:slug/@:coords` redirects to `/locations/:id?fly=1`.
+
+### Fly-to
+- `?fly=1` external-entry hint: `MapPage` flies the map to the selected location; merged into `Recenter` (`flyTo` wins over a slow geolocation resolve). In-place marker clicks don't re-center.
+
+### Tests & verification
+- **60 backend unit tests** (6 new): category required/unknown, category-only PATCH, resolve query schema.
+- **Live E2E (HTTP)** — 16 checks, all green: category on list/detail, create 400-without/201-with, PATCH category, resolve nearest + 404, save read/toggle/list + 401.
+- Frontend: `tsc` + vite build green. Pending: interactive browser pass.
+
+## 7. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -121,15 +150,18 @@ Grilling-round design (2026-10-10): creation-order carousel (no reorder endpoint
 | Lightbox: zooming after navigating slides jumped back to the first-opened image | The zoom toggle reInits embla, and `reActivate` merges the watched options OVER the preserved snap — so the `startIndex` still sitting in `opts` re-applied the originally-opened slide | Remove `startIndex` from the watched options; scroll to the clicked slide imperatively once in a `useLayoutEffect` (pre-paint). Without it, reInit keeps the current slide |
 | Lightbox: Escape also closed the sidebar (X closed only the lightbox) | Radix dismisses on Escape from a document-CAPTURE listener; by the time the keydown reached the sidebar's window-level Escape handler, React had committed `lightboxIndex = null`, so the sidebar treated it as its own close | Handle Escape inside the dialog: `onEscapeKeyDown` preventDefault (Radix stays out of it) + React `onKeyDown` that closes and `stopPropagation()`s so the window listener never sees the event |
 
-## 7. Remaining open work
+## 8. Remaining open work
 
+- `search` (0/6): semantic location search (local embeddings + pgvector) — grilled, not implemented.
+- `tile-layers` (0/5): key-free tile-layer switcher — grilled, not implemented.
+- `report-resolution` (0/8): report lifecycle + admin UI — grilled, not implemented.
 - `models-3d` (0/3): admin registration API, sourcing demo GLBs (needs human), R3F viewer.
-- `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads.
+- `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads; 05: map zoom + marker icons (needs-info).
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Images: interactive browser pass of the carousel/dropzone/reports UI (build-verified only).
+- Interactive browser pass: sidebar-redesign (this feature) + images UI (build-verified only).
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 8. Doc map
+## 9. Doc map
 
 | Doc | Purpose |
 |---|---|

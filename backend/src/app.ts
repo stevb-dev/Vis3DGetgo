@@ -8,6 +8,7 @@ import locationRoutes from './routes/locations'
 import imageRoutes from './routes/images'
 import reportRoutes from './routes/reports'
 import modelRoutes from './routes/models'
+import savedRoutes from './routes/saved'
 import { notFound, errorHandler } from './middleware/errorHandler'
 
 export function createApp() {
@@ -26,6 +27,7 @@ export function createApp() {
   app.use('/api/locations', locationRoutes)
   app.use('/api', imageRoutes) // mounts /api/locations/:id/images and /api/images/:id
   app.use('/api', reportRoutes) // mounts /api/images/:id/report, /api/locations/:id/report, /api/reports
+  app.use('/api', savedRoutes) // mounts /api/locations/:id/save (GET/POST) and /api/saved/locations
   app.use('/api/models', modelRoutes)
 
   app.use(notFound)

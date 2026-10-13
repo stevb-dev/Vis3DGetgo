@@ -4,13 +4,25 @@ import { useMap } from 'react-leaflet'
 
 /**
  * react-leaflet v4 applies MapContainer's center prop only on mount, so a
- * late-arriving position (geolocation) needs an explicit setView.
+ * late-arriving position (geolocation) needs an explicit setView. When a
+ * `flyTo` target is present (external entry via ?fly=1) it wins over the
+ * initial center, so a slow geolocation resolve can't undo the fly.
  */
-export function Recenter({ center }: { center: [number, number] }) {
+export function Recenter({
+  center,
+  flyTo,
+}: {
+  center: [number, number]
+  flyTo?: [number, number] | null
+}) {
   const map = useMap()
   useEffect(() => {
-    map.setView(center)
-  }, [center, map])
+    if (flyTo) {
+      map.flyTo(flyTo, 15, { duration: 0.8 })
+    } else {
+      map.setView(center)
+    }
+  }, [center, flyTo, map])
   return null
 }
 

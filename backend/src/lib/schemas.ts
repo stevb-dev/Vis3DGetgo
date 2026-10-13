@@ -1,10 +1,29 @@
 import { z } from 'zod'
 
+// Location taxonomy (.scratch/sidebar-redesign/issues/01). NATURE was added
+// 2026-10-13 so natural sites like Matka Canyon are honestly labeled.
+export const LOCATION_CATEGORIES = [
+  'MUSEUMS',
+  'ART_GALLERIES',
+  'MONUMENTS',
+  'EDUCATION',
+  'ENTERTAINMENT',
+  'HEALTH',
+  'HOUSING',
+  'STORES',
+  'FINANCE',
+  'FOOD_AND_DRINK',
+  'NATURE',
+] as const
+
+export type LocationCategory = (typeof LOCATION_CATEGORIES)[number]
+
 export const createLocationSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
   description: z.string().trim().max(500, 'Description is too long').optional(),
   latitude: z.number({ message: 'Latitude is required' }).min(-90).max(90),
   longitude: z.number({ message: 'Longitude is required' }).min(-180).max(180),
+  category: z.enum(LOCATION_CATEGORIES, { message: 'Category is required' }),
 })
 
 export type CreateLocationInput = z.infer<typeof createLocationSchema>
@@ -15,8 +34,9 @@ export const updateLocationSchema = z
   .object({
     name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long').optional(),
     description: z.string().trim().max(500, 'Description is too long').nullable().optional(),
+    category: z.enum(LOCATION_CATEGORIES).optional(),
   })
-  .refine((v) => v.name !== undefined || v.description !== undefined, {
+  .refine((v) => v.name !== undefined || v.description !== undefined || v.category !== undefined, {
     message: 'Nothing to update',
   })
 
@@ -27,6 +47,12 @@ export const nearbyQuerySchema = z.object({
   lng: z.coerce.number().min(-180).max(180),
   // Radius in meters; default 1000, capped at 50000.
   radius: z.coerce.number().min(1).max(50000).default(1000),
+})
+
+// Share-slug resolution: coords → nearest location (see sidebar-redesign/04).
+export const resolveQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
 })
 
 // ── Images / reports ────────────────────────────────────────────────────────
