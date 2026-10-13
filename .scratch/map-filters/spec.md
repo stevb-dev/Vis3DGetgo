@@ -11,12 +11,12 @@ no migration, no new dependency.
 |---|---|---|
 | 1 | Strategy | Category filter + zoom declutter (no marker clustering — dataset ceiling is <20) |
 | 2 | "Point of interest" | Dynamic — the currently-selected category, not a static/seeded set |
-| 3 | Filter UI | Chip/toggle buttons, single active category |
+| 3 | Filter UI | Chip/toggle buttons (single active category), per-category icon, edge scroll arrows |
 | 4 | Filter state | `?category=<value>` URL query param (ADR-0002: URL is the source of truth) |
 | 5 | Category selected | Show only that category's pins at ALL zooms + the selected pin |
 | 6 | No category selected | Below zoom 12 hide all markers; at/above 12 show everything |
 | 7 | Selected-pin exemption | The selected location's marker (and any `?fly=1` target) is always visible |
-| 8 | Empty map below 12, no filter | Accepted as-is — no floor, no hint |
+| 8 | Empty map below 12, no filter | Subtle empty-state hint pinned to the bottom, no floor |
 | 9 | `seeded` role | None — the 4 landmarks are just locations with a category |
 | 10 | Tracking | New `.scratch/map-filters/` feature (not folded into `frontend-map/05`) |
 

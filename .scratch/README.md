@@ -16,7 +16,7 @@ Local-markdown tracker. Conventions: `docs/agents/issue-tracker.md`; statuses: `
 | `search` | [spec](search/spec.md) | 0 / 6 | Open — semantic location search (local embeddings + pgvector) |
 | `sidebar-redesign` | [spec](sidebar-redesign/spec.md) | 4 / 4 | Sidebar reorder + category (11-value enum) + save/bookmark + share/slug — implemented 2026-10-13 |
 | `tile-layers` | [spec](tile-layers/spec.md) | 0 / 5 | Key-free tile-layer switcher (OpenFreeMap Liberty/Bright/Dark + OpenTopoMap) — grilled, not yet implemented |
-| `map-filters` | [spec](map-filters/spec.md) | 0 / 4 | Category filter (chips, `?category=`) + zoom declutter — grilled, not yet implemented |
+| `map-filters` | [spec](map-filters/spec.md) | 4 / 4 | Category filter (chips, `?category=`) + zoom declutter — implemented 2026-10-13 |
 
 ## Current implementation state
 

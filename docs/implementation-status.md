@@ -132,7 +132,21 @@ Grilling-round design (2026-10-11, extended 2026-10-13): reorder the sidebar, ad
 - **Live E2E (HTTP)** — 16 checks, all green: category on list/detail, create 400-without/201-with, PATCH category, resolve nearest + 404, save read/toggle/list + 401.
 - Frontend: `tsc` + vite build green. Pending: interactive browser pass.
 
-## 7. Bug ledger (root causes worth citing)
+## 7. Map filters — `.scratch/map-filters/` (4/4 resolved)
+
+Category filter + zoom declutter, purely client-side (no backend, no migration, no dependency). Grilled 2026-10-13: category filter over marker clustering (dataset ceiling <20); "point of interest" = the *selected* category (not a static set); chips + `?category=` URL param (ADR-0002); below zoom 12 with no filter the map is empty (a subtle empty-state hint shows).
+
+- **CategoryFilter** (`components/CategoryFilter.tsx`): single-row, horizontally-scrollable chip row overlaid top-center (`z-[1000]`, `.no-scrollbar` in `index.css`), single active category, synced to `?category=` via `useSearchParams` (functional updater, `replace`). Per-category lucide icon (`lib/categoryIcons.tsx`) + left/right scroll arrows that hide at each end. `isLocationCategory` type guard in `lib/types.ts`.
+- **Sidebar meta**: the category badge now carries its icon too (`CategoryIcon` in `LocationSidebar.tsx`), keeping the icon consistent with the chips.
+- **Empty state**: when no markers are visible (below the gate with no filter, or an empty category) a non-interactive hint ("No locations here — pick a category or zoom in") renders pinned to the bottom of the map, so pan/zoom still work.
+- **Visibility predicate** (`MapPage.tsx` `visibleLocations`): selected pin always renders → active category filters at all zooms → else the zoom gate (`ZOOM_GATE = 12`, hidden below).
+- **Live zoom** (`ZoomTracker`): reads `zoomend` — the `MapContainer` `zoom` prop only applies on mount.
+- **Navigation** (`navigateMap`): preserves `?category=` across marker-click/sidebar navigation; the transient `fly` hint is dropped (not carried) so in-place clicks don't re-center.
+- External entry is safe: `?fly=1` flies to zoom 15 (> 12) and the selected pin is exempt.
+
+**Verified**: `tsc` + vite build green. Pending: interactive browser pass.
+
+## 8. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -150,18 +164,18 @@ Grilling-round design (2026-10-11, extended 2026-10-13): reorder the sidebar, ad
 | Lightbox: zooming after navigating slides jumped back to the first-opened image | The zoom toggle reInits embla, and `reActivate` merges the watched options OVER the preserved snap — so the `startIndex` still sitting in `opts` re-applied the originally-opened slide | Remove `startIndex` from the watched options; scroll to the clicked slide imperatively once in a `useLayoutEffect` (pre-paint). Without it, reInit keeps the current slide |
 | Lightbox: Escape also closed the sidebar (X closed only the lightbox) | Radix dismisses on Escape from a document-CAPTURE listener; by the time the keydown reached the sidebar's window-level Escape handler, React had committed `lightboxIndex = null`, so the sidebar treated it as its own close | Handle Escape inside the dialog: `onEscapeKeyDown` preventDefault (Radix stays out of it) + React `onKeyDown` that closes and `stopPropagation()`s so the window listener never sees the event |
 
-## 8. Remaining open work
+## 9. Remaining open work
 
 - `search` (0/6): semantic location search (local embeddings + pgvector) — grilled, not implemented.
 - `tile-layers` (0/5): key-free tile-layer switcher — grilled, not implemented.
 - `report-resolution` (0/8): report lifecycle + admin UI — grilled, not implemented.
 - `models-3d` (0/3): admin registration API, sourcing demo GLBs (needs human), R3F viewer.
-- `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads; 05: map zoom + marker icons (needs-info).
+- `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads; 05: marker icons only (its *zoom* half is superseded by map-filters) — needs-info.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Interactive browser pass: sidebar-redesign (this feature) + images UI (build-verified only).
+- Interactive browser pass: map-filters, sidebar-redesign, images UI (build-verified only).
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 9. Doc map
+## 10. Doc map
 
 | Doc | Purpose |
 |---|---|
