@@ -42,7 +42,16 @@ changes supersede the 10-12 round; the rest is confirmed:
   closes); click-outside/Escape closes. The hover-only menu was unreachable on
   touch; the `lastOpenFreeMapId` toggle bookkeeping disappears with it.
 - Confirmed unchanged: OpenFreeMap vector via MapLibre GL (Liberty/Bright/Dark),
-  OpenTopoMap raster, bundled thumbnails, main map only, no API keys.
+  OpenTopoMap raster, bundled thumbnails, no API keys.
+
+## Decisions (grilling round, 2026-10-14)
+
+- **Create-location map inherits the layer** (supersedes "main map only"): the
+  create-location map now renders the same `TileLayerController` as the main map
+  and reads `?layer=` (default `liberty`), so it no longer reverts to OSM. The
+  "New location" header link carries `?layer=` over, and the create-success
+  navigation preserves it back. The create map gets **no switcher** — it's a
+  transient pick-a-point view.
 
 ## Attribution
 

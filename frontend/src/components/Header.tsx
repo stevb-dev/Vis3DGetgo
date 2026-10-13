@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuthStore, AuthUser } from '@/stores/auth'
@@ -8,6 +8,10 @@ export default function Header() {
   const { accessToken, user, clearAuth } = useAuthStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const location = useLocation()
+  // Carry the active tile layer into the create-location map (tile-layers).
+  const newLocationLayer = new URLSearchParams(location.search).get('layer')
+  const newLocationTo = newLocationLayer ? `/locations/new?layer=${newLocationLayer}` : '/locations/new'
 
   // Fresh user data (incl. role) from the API; falls back to the store on first paint.
   const { data } = useQuery({
@@ -44,7 +48,7 @@ export default function Header() {
                 Reports
               </Link>
             )}
-            <Link to="/locations/new" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link to={newLocationTo} className="text-sm text-muted-foreground hover:text-foreground">
               New location
             </Link>
             <Link to="/saved" className="text-sm text-muted-foreground hover:text-foreground">

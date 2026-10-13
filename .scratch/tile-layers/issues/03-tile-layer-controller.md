@@ -22,7 +22,7 @@ layer imperatively from inside `MapContainer`, swapping cleanly on change.
 ## Notes
 
 - Markers/tooltips sit on panes above the tile pane, so swapping the base layer under them is transparent.
-- The create-location map keeps its own hardcoded OSM `TileLayer` (out of scope).
+- The create-location map now reuses `TileLayerController` + `?layer=` (see spec, 2026-10-14 round) — its own hardcoded OSM `TileLayer` was removed.
 
 ## Comments
 

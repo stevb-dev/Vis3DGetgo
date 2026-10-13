@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet'
+import { MapContainer, Marker, useMapEvents } from 'react-leaflet'
 import { api, ApiError } from '@/lib/api'
 import { defaultIcon } from '@/lib/leafletIcons'
 import { useMapCenter } from '@/hooks/useMapCenter'
 import { Recenter } from '@/components/mapEffects'
 import LocateButton from '@/components/LocateButton'
+import TileLayerController from '@/components/TileLayerController'
 import { Location, LOCATION_CATEGORIES, LOCATION_CATEGORY_LABELS } from '@/lib/types'
+import { DEFAULT_LAYER_ID, getLayer, isTileLayerId } from '@/lib/tileLayers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -23,9 +25,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
 // Mirrors the backend's createLocationSchema.
 const formSchema = z.object({
@@ -52,6 +51,10 @@ export default function CreateLocationPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const center = useMapCenter()
+  const [searchParams] = useSearchParams()
+  // Inherit the main map's active tile layer (tile-layers), default liberty.
+  const rawLayer = searchParams.get('layer')
+  const activeLayer = getLayer(isTileLayerId(rawLayer) ? rawLayer : DEFAULT_LAYER_ID)
   const [picked, setPicked] = useState<Picked | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,7 +77,8 @@ export default function CreateLocationPage() {
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['locations'] })
-      navigate(`/locations/${res.location.id}`)
+      const layer = searchParams.get('layer')
+      navigate(`/locations/${res.location.id}${layer ? `?layer=${layer}` : ''}`)
     },
     onError: (err) => {
       setError(err instanceof ApiError ? err.message : 'Something went wrong')
@@ -90,7 +94,7 @@ export default function CreateLocationPage() {
   return (
     <div className="relative flex-1">
       <MapContainer center={center} zoom={13} scrollWheelZoom className="relative h-[calc(100vh-3.5rem)] w-full">
-        <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
+        <TileLayerController layer={activeLayer} />
         <Recenter center={center} />
         <ClickCatcher onPick={handlePick} />
         <LocateButton />
