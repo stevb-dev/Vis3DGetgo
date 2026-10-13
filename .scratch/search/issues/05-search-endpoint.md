@@ -1,6 +1,6 @@
 # 05: Search endpoint (cosine ranking + floor)
 
-Status: ready-for-agent
+Status: resolved
 Feature: search
 Blocked by: 01, 02
 
@@ -24,3 +24,5 @@ Blocked by: 01, 02
 - Tune the floor against the seed landmarks + real queries before finalising; record the chosen value in a comment.
 
 ## Comments
+
+- 2026-10-14 (agent): Implemented. `GET /api/locations/search?q=` (registered before `/:id`), cosine `<=>` + floor 0.4 + LIMIT 8, thumbnail-enriched. E2E verified via HTTP: "castle" → Skopje Fortress (0.82), Stone Bridge, Matka Canyon…

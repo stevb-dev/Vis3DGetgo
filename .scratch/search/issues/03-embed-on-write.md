@@ -1,6 +1,6 @@
 # 03: Embed on create + update (degrade to NULL)
 
-Status: ready-for-agent
+Status: resolved
 Feature: search
 Blocked by: 01, 02
 
@@ -22,3 +22,5 @@ Every location must be searchable, and `name`/`description` are editable via `PA
 - Prisma can't write `Unsupported("vector")` fields through the normal client — raw SQL is required.
 
 ## Comments
+
+- 2026-10-14 (agent): Implemented. `POST` and `PATCH` call `embedLocationAndStore` (degrade to NULL on failure); the vector is serialized `[a,b,c]` and cast `::vector` via `$executeRaw` in `lib/search.ts`.

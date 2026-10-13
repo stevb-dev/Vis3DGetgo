@@ -1,6 +1,6 @@
 # 02: Embedding service + model baked into the image
 
-Status: ready-for-agent
+Status: resolved
 Feature: search
 
 ## Context
@@ -23,3 +23,5 @@ In-process `@huggingface/transformers` (ONNX) runs `Xenova/multilingual-e5-small
 - Keep the model out of git (gitignore); it lives in the image build cache, not the repo.
 
 ## Comments
+
+- 2026-10-14 (agent): Implemented. `@huggingface/transformers` 4.3.1; `lib/embedding.ts` lazy singleton with `embedPassage`/`embedQuery`/`locationText`/`warmEmbeddingModel`; model baked into `Dockerfile` + `Dockerfile.dev` (q8 quantized). Note: v4 defaulted to fp32 (`model.onnx`), so the pipeline passes `dtype: 'q8'` to use the smaller baked `model_quantized.onnx`.

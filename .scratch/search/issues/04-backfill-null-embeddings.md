@@ -1,6 +1,6 @@
 # 04: Backfill NULL embeddings (startup + interval)
 
-Status: ready-for-agent
+Status: resolved
 Feature: search
 Blocked by: 01, 02
 
@@ -22,3 +22,5 @@ Existing/seed rows and any degrade-path failures have a NULL embedding. Backfill
 - Keep it O(rows-with-NULL), not O(all rows) — the seeded set is tiny but user growth is unbounded.
 
 ## Comments
+
+- 2026-10-14 (agent): Implemented. `lib/search.ts` `backfillEmbeddings()` (idempotent, concurrency-guarded) runs at startup after model warm + on a 10-min interval; logs the count. Backfilled 7 rows at first boot.

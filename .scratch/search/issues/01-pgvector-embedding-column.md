@@ -1,6 +1,6 @@
 # 01: pgvector extension + embedding column
 
-Status: ready-for-agent
+Status: resolved
 Feature: search
 
 ## Context
@@ -22,3 +22,5 @@ Feature: search
 - The column is intentionally **not** backfilled here — see ticket 04.
 
 ## Comments
+
+- 2026-10-14 (agent): Implemented. `db/Dockerfile` compiles pgvector v0.7.4 into `postgis:16-3.4-alpine` (needs `clang15 llvm15` for PG16's LLVM bitcode step); `schema.prisma` adds the `vector` extension + `embedding Unsupported("vector(384)")?`; migration `20261014000000_location_embedding`. Verified: `docker compose build db` + migrate applied cleanly.

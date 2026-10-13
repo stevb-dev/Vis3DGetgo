@@ -19,6 +19,18 @@ Semantic location search: find locations by *meaning* (not exact keyword), multi
 
 **Minor defaults (flag if wrong):** top 8 results; 300ms debounce; min 2 chars; empty query → no results; one model instance warmed at API startup (singleton, reused for write- and query-embedding); backfill interval ~10 min; e5 query/passage prefix convention (`query: ` / `passage: `); similarity floor default `0.4` (tuned against real data).
 
+## Decisions (grilling round, 2026-10-13)
+
+Re-opened after map-filters + tile-layers landed:
+
+- **Search box placement**: top-center, stacked above the category filter chips
+  (supersedes ticket 06's "top-left" — avoids a top-edge collision with the chips).
+- **Search is global + clears the filter**: the search endpoint queries all
+  locations; selecting a result clears the active `?category=` (search and filter
+  are independent discovery modes — they don't compose).
+- Confirmed unchanged: semantic (pgvector + local e5), synchronous embed-on-write
+  with degrade-to-NULL, ephemeral query (not in the URL).
+
 ## Endpoints
 
 | Method | Endpoint | Auth | Status |

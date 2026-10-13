@@ -159,7 +159,20 @@ Switchable key-free base layers on the main map: OpenFreeMap (vector, Liberty/Br
 
 **Verified**: `tsc` + vite build green (worker chunk emitted). Pending: interactive browser pass. Bundle grew to ~1.75 MB (maplibre-gl) — accepted cost of vector tiles.
 
-## 9. Bug ledger (root causes worth citing)
+## 9. Search — `.scratch/search/` (6/6 resolved)
+
+Semantic location search: local multilingual embeddings (e5-small) + pgvector, no external API. Grilled 2026-10-10 + 2026-10-13 (the latter moved the box above the chips and made search clear the category filter).
+
+- **DB**: `db/Dockerfile` compiles pgvector v0.7.4 into postgis:16-3.4-alpine; `embedding vector(384)` column (migration `20261014000000_location_embedding`).
+- **Embedding** (`lib/embedding.ts`): `@huggingface/transformers` 4.3.1, `Xenova/multilingual-e5-small` (q8 quantized, baked into the image), lazy singleton, `embedPassage`/`embedQuery` (e5 `query:`/`passage:` prefixes), warmed at startup.
+- **Embed on write** (`lib/search.ts` `embedLocationAndStore`): POST/PATCH embed synchronously, degrade to NULL on failure; vector serialized `[a,b,c]::vector` via raw SQL.
+- **Backfill** (`backfillEmbeddings`): startup + 10-min interval, idempotent, concurrency-guarded.
+- **Endpoint**: `GET /api/locations/search?q=` — cosine `<=>` + floor 0.4 + LIMIT 8, thumbnail-enriched. E2E: "castle" → Skopje Fortress (0.82).
+- **UI** (`SearchBox.tsx`): top-center above the category chips; 300ms debounce; select → fly + clear `?category=`.
+
+**Verified**: 60 unit tests + typecheck green; live HTTP E2E (semantic matches incl. Macedonian). The backend image now carries the ~120MB quantized model + onnxruntime native deps. Pending: browser pass on the search UI.
+
+## 10. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -178,17 +191,16 @@ Switchable key-free base layers on the main map: OpenFreeMap (vector, Liberty/Br
 | Lightbox: zooming after navigating slides jumped back to the first-opened image | The zoom toggle reInits embla, and `reActivate` merges the watched options OVER the preserved snap — so the `startIndex` still sitting in `opts` re-applied the originally-opened slide | Remove `startIndex` from the watched options; scroll to the clicked slide imperatively once in a `useLayoutEffect` (pre-paint). Without it, reInit keeps the current slide |
 | Lightbox: Escape also closed the sidebar (X closed only the lightbox) | Radix dismisses on Escape from a document-CAPTURE listener; by the time the keydown reached the sidebar's window-level Escape handler, React had committed `lightboxIndex = null`, so the sidebar treated it as its own close | Handle Escape inside the dialog: `onEscapeKeyDown` preventDefault (Radix stays out of it) + React `onKeyDown` that closes and `stopPropagation()`s so the window listener never sees the event |
 
-## 10. Remaining open work
+## 11. Remaining open work
 
-- `search` (0/6): semantic location search (local embeddings + pgvector) — grilled, not implemented.
 - `report-resolution` (0/8): report lifecycle + admin UI — grilled, not implemented.
 - `models-3d` (0/3): admin registration API, sourcing demo GLBs (needs human), R3F viewer.
 - `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads; 05: marker icons only (its *zoom* half is superseded by map-filters) — needs-info.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Interactive browser pass: tile-layers, map-filters, sidebar-redesign, images UI (build-verified only).
+- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI (build-verified only).
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 11. Doc map
+## 12. Doc map
 
 | Doc | Purpose |
 |---|---|
