@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { api, ApiError } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { LOCATION_CATEGORIES, LOCATION_CATEGORY_LABELS, Location, ReportCategory } from '@/lib/types'
+import { CategoryIcon } from '@/lib/categoryIcons'
 import { cn, buildShareUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -357,7 +358,8 @@ export default function LocationSidebar() {
             </Form>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              <span className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                <CategoryIcon category={loc.category} className="h-3.5 w-3.5" />
                 {LOCATION_CATEGORY_LABELS[loc.category]}
               </span>
             </div>

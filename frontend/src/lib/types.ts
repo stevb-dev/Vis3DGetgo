@@ -31,6 +31,11 @@ export const LOCATION_CATEGORY_LABELS: Record<LocationCategory, string> = {
   NATURE: 'Nature',
 }
 
+/** Type guard for a `?category=` URL value (map-filters). */
+export function isLocationCategory(value: string | null | undefined): value is LocationCategory {
+  return (LOCATION_CATEGORIES as readonly string[]).includes(value as string)
+}
+
 export interface Model {
   id: number
   locationId: number
