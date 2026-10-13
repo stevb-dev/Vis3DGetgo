@@ -8,11 +8,14 @@ import {
   createLocationSchema,
   nearbyQuerySchema,
   resolveQuerySchema,
+  searchQuerySchema,
   thumbnailPatchSchema,
   updateLocationSchema,
   type LocationCategory,
 } from '../lib/schemas'
 import { canModifyLocation } from '../lib/permissions'
+import { embedQuery } from '../lib/embedding'
+import { embedLocationAndStore, SEARCH_FLOOR, SEARCH_LIMIT } from '../lib/search'
 import { authenticate, requireAdmin } from '../middleware/authenticate'
 
 const router = Router()
@@ -131,6 +134,49 @@ router.get('/resolve', async (req, res, next) => {
   }
 })
 
+// Semantic search (registered before '/:id' so 'search' isn't parsed as an id).
+// Cosine over the embedding column; thumbnail-enriched like the list endpoint.
+router.get('/search', async (req, res, next) => {
+  try {
+    const { q } = searchQuerySchema.parse(req.query)
+    const vec = await embedQuery(q)
+    const vecStr = `[${vec.join(',')}]`
+
+    interface SearchRow {
+      id: number
+      name: string
+      description: string | null
+      latitude: number
+      longitude: number
+      similarity: number
+    }
+
+    const rows = await prisma.$queryRaw<SearchRow[]>`
+      SELECT l.id, l.name, l.description, l.latitude, l.longitude,
+             1 - (l.embedding <=> ${vecStr}::vector) AS similarity
+      FROM "Location" l
+      WHERE l.embedding IS NOT NULL
+        AND 1 - (l.embedding <=> ${vecStr}::vector) >= ${SEARCH_FLOOR}
+      ORDER BY l.embedding <=> ${vecStr}::vector ASC
+      LIMIT ${SEARCH_LIMIT}
+    `
+
+    // Same thumbnail resolution as GET /locations (pinned ?? first-by-order).
+    const withThumb = await prisma.location.findMany({
+      where: { id: { in: rows.map((r) => r.id) } },
+      include: { thumbnailImage: true, images: { orderBy: { order: 'asc' }, take: 1 } },
+    })
+    const thumbById = new Map(withThumb.map((l) => [l.id, l.thumbnailImage ?? l.images[0] ?? null]))
+
+    res.json({ results: rows.map((r) => ({ ...r, thumbnail: thumbById.get(r.id) ?? null })) })
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: err.flatten() })
+    }
+    next(err)
+  }
+})
+
 router.get('/:id', async (req, res, next) => {
   try {
     const id = Number(req.params.id)
@@ -165,6 +211,9 @@ router.post('/', authenticate, async (req, res, next) => {
     const location = await prisma.location.create({
       data: { ...body, userId: req.userId },
     })
+
+    // Embed synchronously (degrade to NULL on failure — search ticket 03).
+    await embedLocationAndStore(location.id, location.name, location.description)
 
     res.status(201).json({ location })
   } catch (err) {
@@ -240,6 +289,12 @@ router.patch('/:id', authenticate, async (req, res, next) => {
     if (body.category !== undefined) data.category = body.category
 
     const updated = await prisma.location.update({ where: { id }, data })
+
+    // Re-embed only when the searchable text (name/description) changed.
+    if (data.name !== undefined || data.description !== undefined) {
+      await embedLocationAndStore(id, updated.name, updated.description)
+    }
+
     res.json({ location: updated })
   } catch (err) {
     if (err instanceof z.ZodError) {

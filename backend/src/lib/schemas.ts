@@ -55,6 +55,11 @@ export const resolveQuerySchema = z.object({
   lng: z.coerce.number().min(-180).max(180),
 })
 
+// Semantic search (see search/05): trimmed, min 2 chars.
+export const searchQuerySchema = z.object({
+  q: z.string().trim().min(2, 'Query must be at least 2 characters').max(200),
+})
+
 // ── Images / reports ────────────────────────────────────────────────────────
 
 export const REPORT_CATEGORIES = ['SPAM', 'INAPPROPRIATE', 'WRONG_LOCATION', 'BROKEN', 'OTHER'] as const
