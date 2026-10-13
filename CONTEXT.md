@@ -13,6 +13,7 @@ Single-context overview of the **Geospatial 3D Visualization Platform** (thesis 
 - **Seeded location**: one of the 4 demo Skopje landmarks — `seeded = true`, owned by the seed's demo curator account (`SEED_DEMO_*`, an ADMIN persona), badged "Pre-seeded demo location" in the sidebar.
 - **Category**: a fixed 11-value `LocationCategory` taxonomy on every Location (MUSEUMS … FOOD_AND_DRINK, NATURE). Required on create, editable, backfilled to MONUMENTS. Drives future per-category marker icons.
 - **Category filter**: a single-row, horizontally-scrollable chip row over the map toggles a single active `LocationCategory`, encoded in the URL (`?category=<value>`, ADR-0002 — shareable, survives reload). Each chip carries a lucide category icon; left/right edge arrows scroll the row. With a category active, only that category's pins render (at all zooms); with none, below zoom 12 the map hides its pins (a subtle empty-state hint pinned to the bottom), at/above 12 everything shows. The selected location's pin is always visible.
+- **Tile layer**: the map's switchable base layer — OpenFreeMap (vector, Streets/Bright/Dark via MapLibre GL) or OpenTopoMap (raster, Topographic). Switched from a bottom-left control; the active layer is encoded in the URL (`?layer=<id>`, default `liberty`).
 - **Saved location**: a per-user bookmark (`SavedLocation`, unique user+location pair). Toggled from the sidebar header; listed on `/saved`.
 - **Share slug**: a human-readable share URL `/locations/<slug>/@<lat>,<lng>`; the name is cosmetic and the coordinates (5-decimal) are the lookup key, resolving to the canonical `/locations/:id`.
 - **Sidebar**: the location detail panel rendered next to the map at `/locations/:id` (nested route — the map stays mounted). Header (title + clamped description subtitle + Save/Share/Edit/Delete/Report/Close) → meta (badge + category label) → images (carousel above dropzone) → 3D model (hidden when absent). Closed by X, Escape, empty-map click, or re-clicking the selected marker.
@@ -27,6 +28,7 @@ Single-context overview of the **Geospatial 3D Visualization Platform** (thesis 
 - Overlays on the map need z-index > 1000 (Leaflet creates no stacking context).
 - External entry (a `/saved` card or a share link) lands on `/locations/:id?fly=1`; the map flies to the location. In-place marker clicks do not re-center.
 - A category filter (`?category=`) gates which pins show; with no category selected, pins hide below zoom 12 (an empty-state hint appears). The selected pin is always visible.
+- A tile-layer switcher (bottom-left) picks the base layer; the active layer lives in `?layer=`.
 
 ## Sources of truth
 

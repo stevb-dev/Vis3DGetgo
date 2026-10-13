@@ -1,6 +1,6 @@
 # 03: Tile layer controller
 
-Status: ready-for-agent
+Status: resolved
 Feature: tile-layers
 Blocked by: 01, 02
 
@@ -23,3 +23,7 @@ layer imperatively from inside `MapContainer`, swapping cleanly on change.
 
 - Markers/tooltips sit on panes above the tile pane, so swapping the base layer under them is transparent.
 - The create-location map keeps its own hardcoded OSM `TileLayer` (out of scope).
+
+## Comments
+
+- 2026-10-13 (agent): Implemented `TileLayerController.tsx`. Vector renders via `maplibreGL({ style, attributionControl: { customAttribution } })` (the adapter's option — not a top-level `attribution`); raster via `L.tileLayer(url, { attribution, maxZoom, subdomains })`. Swapped on `layer.id` change; cleaned up on unmount.

@@ -1,6 +1,6 @@
 # 02: Tile layer config
 
-Status: ready-for-agent
+Status: resolved
 Feature: tile-layers
 
 ## Context
@@ -31,8 +31,12 @@ A single source of truth for the selectable layers. Replaces the hardcoded
       - OpenFreeMap: `OpenFreeMap · © OpenMapTiles · Data from OpenStreetMap`
       - OpenTopoMap: `© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)`
 - [ ] `DEFAULT_LAYER_ID = 'liberty'`.
-- [ ] Helpers: `getLayer(id)`, `isTopo(id)`, and a pure `toggleLayer(activeId, lastOpenFreeMapId)` returning the next active id (Topo ↔ the remembered OpenFreeMap style; see 04 for the `lastOpenFreeMapId` bookkeeping).
+- [ ] Helpers: `getLayer(id)` and an `isTileLayerId(value)` type guard (for parsing the `?layer=` URL param, mirroring `isLocationCategory`). No toggle helpers — the topo↔style toggle was dropped (see spec, 2026-10-13 round).
 
 ## Notes
 
 - Keep this file free of React/Leaflet imports so it stays trivially testable.
+
+## Comments
+
+- 2026-10-13 (agent): Implemented `lib/tileLayers.ts` (`TileLayerId`/`TileLayerDef`, `TILE_LAYERS`, `DEFAULT_LAYER_ID`, `getLayer`, `isTileLayerId`). Toggle helpers dropped per the 2026-10-13 grilling round.

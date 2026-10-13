@@ -146,7 +146,20 @@ Category filter + zoom declutter, purely client-side (no backend, no migration, 
 
 **Verified**: `tsc` + vite build green. Pending: interactive browser pass.
 
-## 8. Bug ledger (root causes worth citing)
+## 8. Tile layers — `.scratch/tile-layers/` (5/5 resolved)
+
+Switchable key-free base layers on the main map: OpenFreeMap (vector, Liberty/Bright/Dark via MapLibre GL) + OpenTopoMap (raster). Grilled 2026-10-12 + 2026-10-13 (the latter moved the layer into the URL and switched the control to click-to-open).
+
+- **Deps** (`main.tsx`): `maplibre-gl` + `@maplibre/maplibre-gl-leaflet`; `setWorkerUrl(maplibre-gl-worker.mjs?worker&url)`; `maplibre-gl.css`.
+- **Config** (`lib/tileLayers.ts`): `TileLayerId`/`TileLayerDef`, `TILE_LAYERS`, `DEFAULT_LAYER_ID`, `getLayer`, `isTileLayerId` — pure, testable.
+- **Controller** (`components/TileLayerController.tsx`): swaps the base layer imperatively on `layer.id` — vector via `maplibreGL({ style, attributionControl: { customAttribution } })`, raster via `L.tileLayer`.
+- **Switcher** (`components/TileLayerSwitcher.tsx`): bottom-left square (active thumbnail); click opens a menu to the right; outside-click/Escape closes.
+- **State**: `?layer=<id>` URL param (default `liberty`), preserved by `navigateMap` alongside `?category=`.
+- **Thumbnails** (`public/layers/`): `topo.png` is a real OpenTopoMap tile; the three OpenFreeMap ones are gradient placeholders (soft spot, not faithful captures).
+
+**Verified**: `tsc` + vite build green (worker chunk emitted). Pending: interactive browser pass. Bundle grew to ~1.75 MB (maplibre-gl) — accepted cost of vector tiles.
+
+## 9. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -164,18 +177,17 @@ Category filter + zoom declutter, purely client-side (no backend, no migration, 
 | Lightbox: zooming after navigating slides jumped back to the first-opened image | The zoom toggle reInits embla, and `reActivate` merges the watched options OVER the preserved snap — so the `startIndex` still sitting in `opts` re-applied the originally-opened slide | Remove `startIndex` from the watched options; scroll to the clicked slide imperatively once in a `useLayoutEffect` (pre-paint). Without it, reInit keeps the current slide |
 | Lightbox: Escape also closed the sidebar (X closed only the lightbox) | Radix dismisses on Escape from a document-CAPTURE listener; by the time the keydown reached the sidebar's window-level Escape handler, React had committed `lightboxIndex = null`, so the sidebar treated it as its own close | Handle Escape inside the dialog: `onEscapeKeyDown` preventDefault (Radix stays out of it) + React `onKeyDown` that closes and `stopPropagation()`s so the window listener never sees the event |
 
-## 9. Remaining open work
+## 10. Remaining open work
 
 - `search` (0/6): semantic location search (local embeddings + pgvector) — grilled, not implemented.
-- `tile-layers` (0/5): key-free tile-layer switcher — grilled, not implemented.
 - `report-resolution` (0/8): report lifecycle + admin UI — grilled, not implemented.
 - `models-3d` (0/3): admin registration API, sourcing demo GLBs (needs human), R3F viewer.
 - `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads; 05: marker icons only (its *zoom* half is superseded by map-filters) — needs-info.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Interactive browser pass: map-filters, sidebar-redesign, images UI (build-verified only).
+- Interactive browser pass: tile-layers, map-filters, sidebar-redesign, images UI (build-verified only).
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 10. Doc map
+## 11. Doc map
 
 | Doc | Purpose |
 |---|---|

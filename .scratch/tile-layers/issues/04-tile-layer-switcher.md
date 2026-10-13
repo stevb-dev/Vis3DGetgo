@@ -1,25 +1,30 @@
 # 04: Tile layer switcher
 
-Status: ready-for-agent
+Status: resolved
 Feature: tile-layers
 Blocked by: 02, 05
 
 ## Context
 
-The bottom-left control. One always-visible square (shows the active layer's
-thumbnail) that both toggles on click and reveals a hover menu of all layers.
+The bottom-left control: a square showing the active layer's thumbnail. Clicking
+it opens a menu to the right; picking a layer selects it and closes the menu.
+The active layer lives in the URL (`?layer=<id>`), like the category filter.
 
 ## Requirements
 
 - [ ] New `frontend/src/components/TileLayerSwitcher.tsx`, rendered as a sibling of `MapContainer` inside the `relative` wrapper in `MapPage` (so it anchors to the map area), `absolute bottom-* left-*` with `z-[1000]`.
-- [ ] State lives in `MapPage`: `activeId` + `lastOpenFreeMapId` (default `liberty`). Pass `activeId`, `onSelect(id)`, and `onToggle()` down.
-- [ ] Trigger square shows `<img src={activeLayer.thumbnail}>` (the active layer's thumbnail) with an accessible label.
-- [ ] Hover menu: a flex row to the right of the square — one square div per layer (thumbnail + type `label` beneath), the active one visually marked. Clicking a menu item calls `onSelect(id)`.
-- [ ] Click-to-toggle (use `toggleLayer` from `lib/tileLayers.ts`): Topo ↔ the last-picked OpenFreeMap style (defaults to Liberty). Selecting a non-topo item also updates `lastOpenFreeMapId`.
-- [ ] Hide-after-500 ms: wrap the square + menu in one container; `mouseenter` clears a pending hide timeout, `mouseleave` starts a 500 ms timeout that hides the menu. Hovering the menu (a child) therefore keeps it open.
-- [ ] `L.DomEvent.disableClickPropagation` / `disableScrollPropagation` on the control so clicks/scroll don't leak to the map (mirrors `LocateButton`).
+- [ ] Active id comes from `?layer=` in `MapPage` via `useSearchParams` (default `liberty`; unknown values fall back to `liberty`). Pass `activeId` + `onSelect(id)` down; menu open/close is local state in the switcher.
+- [ ] Trigger square shows `<img src={activeLayer.thumbnail}>` (accessible label). Click toggles the menu open/closed.
+- [ ] Menu: a horizontal flex row to the right of the square — one square per layer (thumbnail + `label`), the active one visually marked. Clicking an item calls `onSelect(id)` and closes the menu.
+- [ ] Close on outside click and Escape.
+- [ ] `navigateMap` in `MapPage` preserves `?layer=` alongside `?category=` (still drops the transient `fly`).
 
 ## Notes
 
-- Toggle and hover are independent: click flips the layer instantly without opening the menu; hover opens the menu without changing the layer.
-- Toggle bookkeeping: moving off a non-topo layer (e.g. Bright) to Topo sets `lastOpenFreeMapId` to that layer; moving off Topo restores `lastOpenFreeMapId` unchanged.
+- No `L.DomEvent.disableClickPropagation` needed — the switcher is a sibling overlay (like `CategoryFilter`), not a child of `MapContainer`.
+- The click-to-toggle (`topo ↔ last style`) interaction is dropped; there is no `lastOpenFreeMapId` bookkeeping.
+- Menu is transient UI state (not in the URL); only the selected layer is `?layer=`.
+
+## Comments
+
+- 2026-10-13 (agent): Implemented `TileLayerSwitcher.tsx` (bottom-left, click-to-open menu to the right, outside-click/Escape closes). State via `?layer=` in `MapPage`; `navigateMap` preserves `?layer=` alongside `?category=`.

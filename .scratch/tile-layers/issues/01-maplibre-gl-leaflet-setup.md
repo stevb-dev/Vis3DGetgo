@@ -1,6 +1,6 @@
 # 01: MapLibre GL Leaflet setup
 
-Status: ready-for-agent
+Status: resolved
 Feature: tile-layers
 
 ## Context
@@ -22,3 +22,7 @@ Leaflet. Add the two dependencies and wire up MapLibre's worker + CSS for Vite.
 
 - `@maplibre/maplibre-gl-leaflet` exposes `maplibreGL({ style, attribution })` and `.getMaplibreMap()`. It is 2D-only (no pitch/bearing/rotation) — the reason the OpenFreeMap "3D" view is out of scope (see spec).
 - No `vite.config.ts` change is expected — the `?worker&url` import is handled by Vite out of the box.
+
+## Comments
+
+- 2026-10-13 (agent): Implemented. Added `maplibre-gl` + `@maplibre/maplibre-gl-leaflet`; `main.tsx` imports `maplibre-gl.css` and calls `setWorkerUrl(maplibre-gl-worker.mjs?worker&url)`; `vite-env.d.ts` declares `*?worker&url`. Build emits the worker chunk cleanly.

@@ -29,6 +29,21 @@ of all layers to its right.
   trigger; hides **500 ms** after leaving both the trigger and the menu.
 - Thumbnails are bundled static PNGs under `frontend/public/layers/`.
 
+## Decisions (grilling round, 2026-10-13)
+
+Re-opened after the map-filters feature landed (ADR-0002 URL convention). Two
+changes supersede the 10-12 round; the rest is confirmed:
+
+- **Active layer → URL** (supersedes "reset every session"): encoded as
+  `?layer=<id>` (default `liberty`), like the category filter's `?category=`.
+  Shareable, survives reload, combines cleanly with `?category=`.
+- **Switcher → click-to-open** (supersedes "click toggles + hover menu"): the
+  bottom-left square opens a menu on click; picking a layer selects it (and
+  closes); click-outside/Escape closes. The hover-only menu was unreachable on
+  touch; the `lastOpenFreeMapId` toggle bookkeeping disappears with it.
+- Confirmed unchanged: OpenFreeMap vector via MapLibre GL (Liberty/Bright/Dark),
+  OpenTopoMap raster, bundled thumbnails, main map only, no API keys.
+
 ## Attribution
 
 - OpenFreeMap: `OpenFreeMap · © OpenMapTiles · Data from OpenStreetMap`
