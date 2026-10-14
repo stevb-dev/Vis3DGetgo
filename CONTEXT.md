@@ -5,7 +5,7 @@ Single-context overview of the **Geospatial 3D Visualization Platform** (thesis 
 ## Core concepts
 
 - **Location**: a point on the map (lat/lng). Pre-seeded (userId null, admin-managed) or user-created (owned by a User). Optionally has one 3D Model; collects Images into a carousel.
-- **Model**: a pre-seeded GLB file, 1:1 with a Location. Registered by an admin only.
+- **Model**: a pre-seeded 3D file — GLB (Draco mesh) or SPZ (3D Gaussian splat) — 1:1 with a Location. Uploaded/registered by an admin only; `Model.format` tells the viewer which renderer to use.
 - **Image**: a user upload to a Location. WebP after server-side optimization (sharp, ≤1200×800). Ordered via `Image.order` to form the carousel. Owned by the uploading User. Anyone may upload to any Location (open carousel); junk is handled by Reports.
 - **Carousel**: the ordered image list of one Location. Creation-order only — there is deliberately no reorder endpoint (grilling decision: reordering opened a thumbnail-hijack hole). Deleting an image shifts later orders down (contiguous 1..N).
 - **Thumbnail**: the image shown on the map tooltip — the admin-pinned image (`Location.thumbnailImageId`) or, when unpinned, the first image by carousel order. The location creator may pick it from their initial upload batch; after that, only admins change it (`PATCH /api/locations/:id/thumbnail`).
@@ -21,7 +21,7 @@ Single-context overview of the **Geospatial 3D Visualization Platform** (thesis 
 - **Search**: semantic, multilingual (English + Macedonian) free-text search over locations, from a search box top-center. Local `multilingual-e5-small` embeddings (384-dim, q8, baked into the image) + pgvector cosine ranking — no external API. Selecting a result flies to `/locations/:id?fly=1` and clears the category filter (search and filter are independent discovery modes).
 - **Saved location**: a per-user bookmark (`SavedLocation`, unique user+location pair). Toggled from the sidebar header; listed on `/saved`.
 - **Share slug**: a human-readable share URL `/locations/<slug>/@<lat>,<lng>`; the name is cosmetic and the coordinates (5-decimal) are the lookup key, resolving to the canonical `/locations/:id`.
-- **Sidebar**: the location detail panel rendered next to the map at `/locations/:id` (nested route — the map stays mounted). Header (title + clamped description subtitle + Save/Share/Edit/Delete/Report/Close) → meta (badge + category label) → images (carousel above dropzone) → 3D model (hidden when absent). Closed by X, Escape, empty-map click, or re-clicking the selected marker.
+- **Sidebar**: the location detail panel rendered next to the map at `/locations/:id` (nested route — the map stays mounted). Header (title + clamped description subtitle + Save/Share/Edit/Delete/Report/Close) → meta (badge + category label) → images (carousel above dropzone) → 3D model (a button opening a viewer modal; hidden when absent). Closed by X, Escape, empty-map click, or re-clicking the selected marker.
 - **Locate button**: bottom-right map control that flies the map to the user's position (min zoom 15) and drops a temporary pulse dot.
 - **Auth**: 15-minute JWT access token (SPA memory + sessionStorage, `Authorization: Bearer`) + opaque 7-day refresh token (httpOnly cookie, SHA-256 hash in DB, rotated on use; reuse revokes the token family). Roles: `USER`, `ADMIN`.
 - **Roles**: `USER` — read everything, create locations, edit/delete own locations without a model or foreign images, upload/delete own images. `ADMIN` — additionally edits/deletes any location and registers models.

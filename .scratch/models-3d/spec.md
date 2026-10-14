@@ -1,18 +1,22 @@
 # models-3d — spec
 
-Pre-seeded GLB models, 1:1 with Location. Admin-only registration API, seed pipeline, R3F viewer in the detail pane.
+Pre-seeded 3D models — GLB meshes or SPZ Gaussian splats — 1:1 with Location.
+Admin-only upload + unregister API, seed pipeline, viewer in the detail pane.
 
 ## Endpoints
 
 | Method | Endpoint | Auth | Status |
 |--------|----------|------|--------|
-| POST | `/api/models` | Admin | open — ticket 01 |
+| POST | `/api/models` | Admin | resolved — ticket 01 |
+| DELETE | `/api/models/:id` | Admin | resolved — ticket 01 |
 
 ## Notes
 
 - Models live in the `/models` volume, served by nginx at `/models/*`.
-- Budget: ≤5MB per GLB after Draco compression.
-- `Model.locationId` is unique — one model per location (upsert semantics for re-seeding).
+- Budget: ≤50MB per file (`.spz` splats are far larger than GLB meshes).
+- `Model.locationId` is unique — one model per location (re-seeding happens via
+  the seed script, ticket 02; the API 409s on an existing model).
+- `Model.format` (GLB | SPZ) drives the viewer's renderer (ticket 03).
 
 ## Tickets
 

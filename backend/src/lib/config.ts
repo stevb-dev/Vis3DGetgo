@@ -18,4 +18,6 @@ export const config = {
   modelsDir: process.env.MODELS_DIR ?? 'models',
   maxUploadMb: Number(process.env.MAX_UPLOAD_MB ?? 5),
   maxImagesPerLocation: Number(process.env.MAX_IMAGES_PER_LOCATION ?? 200),
+  // 3D model upload budget — .spz Gaussian splats are far larger than GLB meshes.
+  maxModelMb: Number(process.env.MAX_MODEL_MB ?? 50),
 } as const

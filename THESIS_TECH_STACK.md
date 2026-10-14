@@ -19,7 +19,7 @@
 | **Frontend** | React + TypeScript | Component architecture, excellent Three.js integration via R3F |
 | **Database** | PostgreSQL + PostGIS | Gold standard for geospatial; spatial queries and indexing are thesis features |
 | **File storage** | Docker volume + Nginx | Zero external dependencies; Nginx serves static files at wire speed |
-| **3D models** | Pre-seeded GLB/GLTF | Web-native format, Three.js optimized, no runtime conversion needed |
+| **3D models** | Pre-seeded GLB + SPZ | GLB (Draco mesh) + SPZ (3D Gaussian splats), both web-native |
 
 ---
 
@@ -191,6 +191,7 @@ model Model {
   filename    String   // e.g., "eiffel-tower.glb"
   filePath    String   // e.g., "/models/eiffel-tower.glb"
   fileSize    Int
+  format      ModelFormat // GLB (mesh) | SPZ (Gaussian splat)
   createdAt   DateTime @default(now())
 }
 
@@ -355,10 +356,10 @@ http {
 ## 7. 3D Model Pipeline
 
 ### Pre-seeded Models
-- **Format:** GLB (binary GLTF) — single file, no external dependencies
-- **Optimization:** Run through `gltf-pipeline` for Draco compression
+- **Format:** GLB (binary GLTF) or SPZ (3D Gaussian splats) — single file, no external dependencies
+- **Optimization:** GLB runs through `gltf-pipeline` for Draco compression; SPZ is already a compact splat format
 - **Storage:** Mounted Docker volume at `/models/` → served by Nginx
-- **Size budget:** Keep models under 5MB each for fast loading
+- **Size budget:** Keep models under 50MB each (`.spz` splats are far larger than GLB meshes)
 
 ### Recommended GLB Workflow
 1. Source models from Sketchfab (CC-licensed) or create in Blender
@@ -527,7 +528,8 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 ### Models (Admin/Seed only)
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/api/models` | Admin | Register pre-seeded model |
+| POST | `/api/models` | Admin | Upload + register a model (multipart: locationId + .glb/.spz file) |
+| DELETE | `/api/models/:id` | Admin | Unregister a model |
 
 ---
 

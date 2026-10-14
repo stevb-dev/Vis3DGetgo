@@ -27,6 +27,7 @@ import {
 import ImageDropzone from '@/components/ImageDropzone'
 import ImageCarousel from '@/components/ImageCarousel'
 import ReportDialog from '@/components/ReportDialog'
+import ModelViewerDialog from '@/components/ModelViewerDialog'
 
 const updateSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
@@ -94,6 +95,7 @@ export default function LocationSidebar() {
   const [reportOpen, setReportOpen] = useState(false)
   // Lifted from the carousel so Escape can close the lightbox first.
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [modelOpen, setModelOpen] = useState(false)
 
   const form = useForm<UpdateValues>({
     resolver: zodResolver(updateSchema),
@@ -380,9 +382,12 @@ export default function LocationSidebar() {
           {loc.model && (
             <section>
               <h3 className="text-sm font-semibold">3D model</h3>
-              <div className="mt-2 flex min-h-[320px] items-center justify-center rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-                Viewer — tracked ticket (.scratch/models-3d/issues/03-r3f-viewer-component.md)
-              </div>
+              <Button variant="outline" className="mt-2 w-full" onClick={() => setModelOpen(true)}>
+                View 3D model
+                <span className="ml-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase">
+                  {loc.model.format}
+                </span>
+              </Button>
             </section>
           )}
         </div>
@@ -415,6 +420,8 @@ export default function LocationSidebar() {
         targetLabel={loc?.name ?? 'location'}
         onSubmit={reportMutation.mutate}
       />
+
+      <ModelViewerDialog model={loc?.model ?? null} open={modelOpen} onOpenChange={setModelOpen} />
     </aside>
   )
 }

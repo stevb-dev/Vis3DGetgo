@@ -33,6 +33,7 @@ services:
       CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-5173}
       MAX_UPLOAD_MB: 5
       MAX_IMAGES_PER_LOCATION: 200
+      MAX_MODEL_MB: 50
       SEED_DEMO_EMAIL: ${SEED_DEMO_EMAIL:-demo@example.com}
       SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-Demo123!}
     volumes:

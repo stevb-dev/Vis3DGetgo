@@ -46,6 +46,11 @@ enum LocationCategory {
   NATURE
 }
 
+enum ModelFormat {
+  GLB
+  SPZ
+}
+
 model User {
   id            Int            @id @default(autoincrement())
   email         String         @unique
@@ -121,7 +126,9 @@ model Model {
   filename  String // e.g., "eiffel-tower.glb"
   filePath  String // e.g., "/models/eiffel-tower.glb"
   fileSize  Int
-  createdAt DateTime @default(now())
+  // GLB (Draco mesh) or SPZ (3D Gaussian splat) — drives the viewer's renderer.
+  format    ModelFormat
+  createdAt DateTime    @default(now())
 }
 
 model Image {

@@ -42,6 +42,8 @@ export interface Model {
   filename: string
   filePath: string
   fileSize: number
+  // GLB (Draco mesh) or SPZ (3D Gaussian splat) — picks the viewer's renderer.
+  format: 'GLB' | 'SPZ'
   createdAt: string
 }
 

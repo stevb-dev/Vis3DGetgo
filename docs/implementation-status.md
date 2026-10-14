@@ -204,7 +204,50 @@ Two-action admin moderation (**Delete content** / **Dismiss**) replacing the sin
 - **Live E2E (HTTP)** — 21 checks green: DELETE (soft-delete 404, list absence, sibling + child-image auto-close, owner notification, unread + read-all) and DISMISS (stays live, note shown to reporter), invalid action 400, report-on-deleted 404.
 - Frontend: `tsc` + vite build green. **Pending: interactive browser pass.**
 
-## 11. Bug ledger (root causes worth citing)
+## 11. 3D models — `.scratch/models-3d/` (2/3)
+
+Admin model upload + unregister (ticket 01). Grilling round (2026-10-14) widened
+the original one-line spec: a single multipart endpoint, `.glb` + `.spz` (3D
+Gaussian splats), 5 MB → 50 MB budget, and a DELETE endpoint.
+
+- **Schema**: `ModelFormat` enum (GLB | SPZ) + `Model.format` — migration
+  `20261014020000_model_format`. The viewer branches on `format` instead of
+  parsing the filePath extension.
+- **`POST /api/models`** (admin, multipart): `locationId` + a single `file`;
+  404 missing/soft-deleted location, 409 existing model, 400 bad extension or
+  >`MAX_MODEL_MB` (default 50). Server writes `<uuid>.<ext>` into the models
+  volume (no path traversal), returns 201 `{ model }`; a DB failure unlinks the
+  fresh file.
+- **`DELETE /api/models/:id`** (admin): hard delete + best-effort unlink, 404.
+- **Config/infra**: `MAX_MODEL_MB` (default 50); nginx `client_max_body_size`
+  10m → 60m (both confs).
+
+**Verified**: 4 new unit tests (`modelFormatFromFilename`), backend `tsc` green,
+live HTTP E2E — upload glb 201 (format GLB) / spz 201 (format SPZ) / re-upload
+409 / missing location 404 / bad ext 400 / non-admin 403 / unauth 401 / delete
+200 / re-delete 404 / no orphan files after delete.
+
+### Viewer (ticket 03)
+
+Modal 3D viewer, grilling round (2026-10-14): modal-only (the sidebar shows a
+"View 3D model" button with a GLB/SPZ label), a single `ModelViewer` branching
+on `format`, orbit-only controls.
+
+- **GLB** → R3F `<Canvas>` + `useGLTF` (Draco via drei) + `<Center>` scale-to-fit.
+- **SPZ** → `@mkkellogg/gaussian-splats-3d` `Viewer` (peer three ≥0.160, matches
+  0.160.1); disposed on unmount. New dep added to `frontend/package.json`.
+- **Lazy**: `React.lazy` + `<Suspense>` — the viewer (three/drei + splat lib)
+  ships as its own 1.14 MB chunk, off the critical path.
+- **Escape/close**: closes the modal without also closing the sidebar (same
+  `stopPropagation` fix as the lightbox bug).
+- `Model.format` added to the frontend `Model` type; `types/gaussian-splats-3d.d.ts`
+  declares the untyped lib.
+
+**Verified**: `tsc` + `vite build` green (viewer code-split into a lazy chunk),
+dev server transforms the modules and resolves the splat dep (HTTP 200).
+Pending: interactive browser pass (needs real `.glb`/`.spz` — ticket 02).
+
+## 12. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -223,15 +266,15 @@ Two-action admin moderation (**Delete content** / **Dismiss**) replacing the sin
 | Lightbox: zooming after navigating slides jumped back to the first-opened image | The zoom toggle reInits embla, and `reActivate` merges the watched options OVER the preserved snap — so the `startIndex` still sitting in `opts` re-applied the originally-opened slide | Remove `startIndex` from the watched options; scroll to the clicked slide imperatively once in a `useLayoutEffect` (pre-paint). Without it, reInit keeps the current slide |
 | Lightbox: Escape also closed the sidebar (X closed only the lightbox) | Radix dismisses on Escape from a document-CAPTURE listener; by the time the keydown reached the sidebar's window-level Escape handler, React had committed `lightboxIndex = null`, so the sidebar treated it as its own close | Handle Escape inside the dialog: `onEscapeKeyDown` preventDefault (Radix stays out of it) + React `onKeyDown` that closes and `stopPropagation()`s so the window listener never sees the event |
 
-## 12. Remaining open work
+## 13. Remaining open work
 
-- `models-3d` (0/3): admin registration API, sourcing demo GLBs (needs human), R3F viewer.
+- `models-3d` (2/3): sourcing demo GLBs/SPZ (needs human, ticket 02).
 - `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads; 05: marker icons only (its *zoom* half is superseded by map-filters) — needs-info.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution (build-verified only).
+- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only).
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 13. Doc map
+## 14. Doc map
 
 | Doc | Purpose |
 |---|---|
