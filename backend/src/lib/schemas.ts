@@ -70,8 +70,11 @@ export const reportBodySchema = z.object({
 
 export type ReportBody = z.infer<typeof reportBodySchema>
 
+// Report resolution (.scratch/report-resolution/02): two-action admin payload.
+// DELETE soft-deletes the reported content; DISMISS closes the report untouched.
 export const resolveReportSchema = z.object({
-  status: z.enum(['OPEN', 'RESOLVED']),
+  action: z.enum(['DELETE', 'DISMISS']),
+  note: z.string().trim().max(500, 'Note is too long').optional(),
 })
 
 // imageId: null clears the pin (thumbnail falls back to first-by-order).

@@ -1,6 +1,6 @@
 # 01 — Schema migration for report resolution
 
-Status: ready-for-agent
+Status: resolved
 
 Extend the Prisma schema and add a migration implementing the data-model changes
 for report resolution. Do not write application code — schema + migration only.
@@ -43,3 +43,7 @@ for report resolution. Do not write application code — schema + migration only
 - `Notification` model and `NotificationType` enum exist as specified.
 - `Image.deletedAt`, `Location.deletedAt`, `User.lastSeenReportsAt`,
   `Report.note` all exist.
+
+## Comments
+
+Resolved 2026-10-14 (migration `20261014010000_report_resolution`). DISMISSED added to `ReportStatus`; `resolvedAt`→`closedAt` rename (data preserved); `note`; `deletedAt` on Image+Location; `lastSeenReportsAt`; `Notification` model + `NotificationType`. Applied via `migrate deploy`, client regenerated in the container.

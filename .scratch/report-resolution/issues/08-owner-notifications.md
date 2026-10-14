@@ -1,6 +1,6 @@
 # 08 — Owner notifications (bell + unread badge)
 
-Status: ready-for-agent
+Status: resolved
 
 Notification bell for content owners when their content is removed by moderation.
 Uses the `Notification` model created in ticket 01.
@@ -28,3 +28,7 @@ Uses the `Notification` model created in ticket 01.
 - Opening the panel shows the removal notice(s) and clears the badge.
 - Notice shows content name + category + optional note; no reporter identity.
 - Users with no notifications see an empty state.
+
+## Comments
+
+Resolved 2026-10-14. `GET /notifications` + `POST /notifications/read-all` + `GET /notifications/unread-count` (new `routes/notifications.ts`). `NotificationBell.tsx` dropdown in the header with an unread badge; opening marks all read. Copy is generic ("Your content … was removed") since the snapshot model carries no image/location kind discriminator.

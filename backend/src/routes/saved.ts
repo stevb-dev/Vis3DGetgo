@@ -41,8 +41,8 @@ router.post('/locations/:id/save', authenticate, async (req, res, next) => {
     }
     const userId = req.userId as number
 
-    // The location must exist (404 mirrors the rest of the API).
-    const location = await prisma.location.findUnique({ where: { id }, select: { id: true } })
+    // The location must exist and be live (404 mirrors the rest of the API).
+    const location = await prisma.location.findFirst({ where: { id, deletedAt: null }, select: { id: true } })
     if (!location) {
       return res.status(404).json({ error: 'Location not found' })
     }
@@ -76,15 +76,15 @@ router.post('/locations/:id/save', authenticate, async (req, res, next) => {
 router.get('/saved/locations', authenticate, async (_req, res, next) => {
   try {
     const saved = await prisma.savedLocation.findMany({
-      where: { userId: _req.userId },
+      where: { userId: _req.userId, location: { deletedAt: null } },
       orderBy: { createdAt: 'desc' },
       include: {
         location: {
           include: {
             model: true,
-            _count: { select: { images: true } },
+            _count: { select: { images: { where: { deletedAt: null } } } },
             thumbnailImage: true,
-            images: { orderBy: { order: 'asc' }, take: 1 },
+            images: { where: { deletedAt: null }, orderBy: { order: 'asc' }, take: 1 },
           },
         },
       },

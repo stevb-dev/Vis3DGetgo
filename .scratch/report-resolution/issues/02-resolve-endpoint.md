@@ -1,6 +1,6 @@
 # 02 — Resolve endpoint: Delete / Dismiss with soft-delete + notifications
 
-Status: ready-for-agent
+Status: resolved
 
 Replace the `{ status }` body of `PATCH /reports/:id` with a two-action payload
 and implement the full resolution behavior. Files: `backend/src/routes/reports.ts`
@@ -57,3 +57,7 @@ are a side effect.
   its images, and notifies the owner.
 - No owner (null `userId`) → no notification, no error.
 - Invalid `action` → `400`; unknown report id → `404` (both unchanged).
+
+## Comments
+
+Resolved 2026-10-14. `PATCH /reports/:id` takes `{ action: DELETE|DISMISS, note? }`. DELETE soft-deletes the target (image, or location + cascade to child images), clears the pinned thumbnail when it's the removed image, auto-closes same-target AND child-image OPEN reports (grilling decision), and notifies only the acted-on target's owner. DISMISS just closes. All multi-step work in one transaction.

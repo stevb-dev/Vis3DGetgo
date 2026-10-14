@@ -25,13 +25,17 @@ const router = Router()
 router.get('/', async (_req, res, next) => {
   try {
     const locations = await prisma.location.findMany({
+      // Soft-deleted locations are hidden from every view (report-resolution/04).
+      where: { deletedAt: null },
       orderBy: { createdAt: 'asc' },
       include: {
         model: true,
-        _count: { select: { images: true } },
-        // Admin-pinned thumbnail (if any) + first image by carousel order as fallback.
+        _count: { select: { images: { where: { deletedAt: null } } } },
+        // Admin-pinned thumbnail (if any) + first live image by carousel order
+        // as fallback. The pin invariant (cleared on soft-delete) keeps
+        // `thumbnailImage` pointing at live content.
         thumbnailImage: true,
-        images: { orderBy: { order: 'asc' }, take: 1 },
+        images: { where: { deletedAt: null }, orderBy: { order: 'asc' }, take: 1 },
       },
     })
     res.json({
@@ -83,6 +87,7 @@ router.get('/nearby', async (req, res, next) => {
         ST_SetSRID(ST_MakePoint(l.longitude, l.latitude), 4326)::geography,
         ${radius}
       )
+      AND l."deletedAt" IS NULL
       ORDER BY "distanceM" ASC
     `
 
@@ -115,6 +120,7 @@ router.get('/resolve', async (req, res, next) => {
         ST_SetSRID(ST_MakePoint(l.longitude, l.latitude), 4326)::geography,
         ${25}
       )
+      AND l."deletedAt" IS NULL
       ORDER BY ST_Distance(
         ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
         ST_SetSRID(ST_MakePoint(l.longitude, l.latitude), 4326)::geography
@@ -156,6 +162,7 @@ router.get('/search', async (req, res, next) => {
              1 - (l.embedding <=> ${vecStr}::vector) AS similarity
       FROM "Location" l
       WHERE l.embedding IS NOT NULL
+        AND l."deletedAt" IS NULL
         AND 1 - (l.embedding <=> ${vecStr}::vector) >= ${SEARCH_FLOOR}
       ORDER BY l.embedding <=> ${vecStr}::vector ASC
       LIMIT ${SEARCH_LIMIT}
@@ -164,7 +171,7 @@ router.get('/search', async (req, res, next) => {
     // Same thumbnail resolution as GET /locations (pinned ?? first-by-order).
     const withThumb = await prisma.location.findMany({
       where: { id: { in: rows.map((r) => r.id) } },
-      include: { thumbnailImage: true, images: { orderBy: { order: 'asc' }, take: 1 } },
+      include: { thumbnailImage: true, images: { where: { deletedAt: null }, orderBy: { order: 'asc' }, take: 1 } },
     })
     const thumbById = new Map(withThumb.map((l) => [l.id, l.thumbnailImage ?? l.images[0] ?? null]))
 
@@ -184,11 +191,11 @@ router.get('/:id', async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid id' })
     }
 
-    const location = await prisma.location.findUnique({
-      where: { id },
+    const location = await prisma.location.findFirst({
+      where: { id, deletedAt: null },
       include: {
         model: true,
-        images: { orderBy: { order: 'asc' } },
+        images: { where: { deletedAt: null }, orderBy: { order: 'asc' } },
       },
     })
     if (!location) {
@@ -235,13 +242,13 @@ router.patch('/:id/thumbnail', authenticate, requireAdmin, async (req, res, next
 
     const { imageId } = thumbnailPatchSchema.parse(req.body)
 
-    const location = await prisma.location.findUnique({ where: { id } })
+    const location = await prisma.location.findFirst({ where: { id, deletedAt: null } })
     if (!location) {
       return res.status(404).json({ error: 'Location not found' })
     }
 
     if (imageId !== null) {
-      const image = await prisma.image.findFirst({ where: { id: imageId, locationId: id } })
+      const image = await prisma.image.findFirst({ where: { id: imageId, locationId: id, deletedAt: null } })
       if (!image) {
         return res.status(400).json({ error: 'Image does not belong to this location' })
       }
@@ -270,9 +277,9 @@ router.patch('/:id', authenticate, async (req, res, next) => {
 
     const body = updateLocationSchema.parse(req.body)
 
-    const location = await prisma.location.findUnique({
-      where: { id },
-      include: { model: true, images: true },
+    const location = await prisma.location.findFirst({
+      where: { id, deletedAt: null },
+      include: { model: true, images: { where: { deletedAt: null } } },
     })
     if (!location) {
       return res.status(404).json({ error: 'Location not found' })
@@ -311,9 +318,9 @@ router.delete('/:id', authenticate, async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid id' })
     }
 
-    const location = await prisma.location.findUnique({
-      where: { id },
-      include: { model: true, images: true },
+    const location = await prisma.location.findFirst({
+      where: { id, deletedAt: null },
+      include: { model: true, images: { where: { deletedAt: null } } },
     })
     if (!location) {
       return res.status(404).json({ error: 'Location not found' })

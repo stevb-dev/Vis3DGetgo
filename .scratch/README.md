@@ -11,6 +11,7 @@ Local-markdown tracker. Conventions: `docs/agents/issue-tracker.md`; statuses: `
 | `locations` | [spec](locations/spec.md) | 4 / 4 | CRUD + PostGIS nearby (geography GIST index) + edit/delete permission model |
 | `frontend-map` | [spec](frontend-map/spec.md) | 2 / 5 | 01 markers (resolved), 04 locate button (resolved); 02/03 partial; 05 future TODO (needs-info) |
 | `images` | [spec](images/spec.md) | 4 / 4 | Upload pipeline + carousel + delete + reports + admin thumbnail pinning |
+| `report-resolution` | [spec](report-resolution/spec.md) | 8 / 8 | Two-action admin resolution (Delete/Dismiss) + soft-delete + notifications + My reports — implemented 2026-10-14 |
 | `models-3d` | [spec](models-3d/spec.md) | 0 / 3 | Open — 02 needs a human to source demo GLBs |
 | `deployment` | [spec](deployment/spec.md) | 0 / 2 | Open — prod runbook, backup rotation docs |
 | `search` | [spec](search/spec.md) | 6 / 6 | Semantic location search (local embeddings + pgvector) — implemented 2026-10-14 |

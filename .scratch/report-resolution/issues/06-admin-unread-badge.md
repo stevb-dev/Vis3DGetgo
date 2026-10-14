@@ -1,6 +1,6 @@
 # 06 — Admin unread badge on the Reports link
 
-Status: ready-for-agent
+Status: resolved
 
 Surface new OPEN reports to admins via an unread badge on the header "Reports"
 link. The count is OPEN reports with `createdAt > currentUser.lastSeenReportsAt`.
@@ -28,3 +28,7 @@ link. The count is OPEN reports with `createdAt > currentUser.lastSeenReportsAt`
 - Header Reports link shows a badge with the unread OPEN count (hidden when 0).
 - Visiting `/admin/reports` clears the badge.
 - Only admins see the badge.
+
+## Comments
+
+Resolved 2026-10-14. `GET /reports/unread-count` + `POST /reports/seen` (both admin). Header badge on the Reports link (hidden at 0). `seen` fires only when the Open tab is active (grilling decision). Count endpoint computes the cutoff server-side, so `lastSeenReportsAt` is not exposed to the client.

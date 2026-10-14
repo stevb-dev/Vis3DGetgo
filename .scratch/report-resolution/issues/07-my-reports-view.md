@@ -1,6 +1,6 @@
 # 07 — Reporter "My reports" view
 
-Status: ready-for-agent
+Status: resolved
 
 A plain list of the current user's own reports with their outcome. No unread
 marker.
@@ -25,3 +25,7 @@ marker.
 - Status shows Open/Resolved/Dismissed.
 - Dismissed reports display the admin's note; resolved reports reflect the
   content-deleted outcome.
+
+## Comments
+
+Resolved 2026-10-14. `GET /my-reports` (authenticated) + `MyReportsPage.tsx` (`/my-reports`, ProtectedRoute) + header link for all logged-in users. Renders category, target name, submission date, status (Open/Resolved/Dismissed), and the dismiss note.

@@ -1,6 +1,6 @@
 # 05 — Admin reports page: Delete/Dismiss dropdown + Open/Closed tabs
 
-Status: ready-for-agent
+Status: resolved
 
 Rework `frontend/src/pages/AdminReportsPage.tsx` to expose the two-action
 resolution workflow and the three-status list.
@@ -30,3 +30,7 @@ resolution workflow and the three-status list.
 - Tabs: Open / Closed; the Closed tab shows resolved and dismissed rows, labeled,
   with their `closedAt`.
 - Success/error toasts behave as today.
+
+## Comments
+
+Resolved 2026-10-14. `AdminReportsPage.tsx` reworked: per-report dropdown (Delete content / Dismiss), confirm dialog with optional note, Open/Closed tabs via `?status=`, closed rows labeled Resolved/Dismissed with `closedAt`. "Open location" hidden for soft-deleted targets.

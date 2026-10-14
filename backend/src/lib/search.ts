@@ -41,7 +41,7 @@ export async function backfillEmbeddings(): Promise<void> {
   backfillRunning = true
   try {
     const rows = await prisma.$queryRaw<{ id: number; name: string; description: string | null }[]>`
-      SELECT id, name, description FROM "Location" WHERE embedding IS NULL
+      SELECT id, name, description FROM "Location" WHERE embedding IS NULL AND "deletedAt" IS NULL
     `
     for (const row of rows) {
       await embedLocationAndStore(row.id, row.name, row.description)

@@ -1,6 +1,6 @@
 # 04 — Filter soft-deleted content from public/owner views
 
-Status: ready-for-agent
+Status: resolved
 
 Every query that returns images or locations to users must exclude rows with
 `deletedAt != null`. Because a location delete cascades `deletedAt` to child
@@ -29,3 +29,7 @@ sites; leave no public path serving soft-deleted content.
   and lists for admins and regular users alike.
 - Soft-deleted content is not retrievable via public endpoints.
 - Deleting a location hides its images and 3D model too.
+
+## Comments
+
+Resolved 2026-10-14. `deletedAt` filtering added to locations list/detail/nearby/resolve/search + saved list, image upload/delete, and the write paths (report/save/thumbnail/edit/delete) 404 on soft-deleted targets. The search backfill skips deleted rows. Relies on the pin-cleared-on-soft-delete invariant so the thumbnail `thumbnailImage` relation stays live.

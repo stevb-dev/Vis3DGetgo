@@ -25,6 +25,11 @@ enum ReportCategory {
 enum ReportStatus {
   OPEN
   RESOLVED
+  DISMISSED
+}
+
+enum NotificationType {
+  MODERATION_REMOVAL
 }
 
 enum LocationCategory {
@@ -53,6 +58,10 @@ model User {
   reports       Report[]
   refreshTokens RefreshToken[]
   savedLocations SavedLocation[]
+  // Admin "last seen reports" watermark (report-resolution/06): the unread badge
+  // counts OPEN reports created after this instant.
+  lastSeenReportsAt DateTime?
+  notifications     Notification[]
 }
 
 model RefreshToken {
@@ -83,6 +92,10 @@ model Location {
 
   // Fixed category taxonomy (.scratch/sidebar-redesign/issues/01).
   category LocationCategory @default(MONUMENTS)
+
+  // Soft-delete timestamp (report-resolution): moderation hides the row from all
+  // queries without hard-deleting, so reports + the audit trail survive.
+  deletedAt DateTime?
 
   // Semantic search embedding (.scratch/search) — multilingual-e5-small (384-dim).
   // Nullable: the degrade path (embedding failure) saves the row unsearchable
@@ -126,6 +139,9 @@ model Image {
   mimeType     String
   order        Int      @default(0) // carousel ordering
   createdAt    DateTime @default(now())
+  // Soft-delete timestamp (report-resolution). A location delete cascades this
+  // to every child image; the file stays on disk.
+  deletedAt    DateTime?
 
   thumbnailOfLocation Location?  @relation("LocationThumbnail")
   reports             Report[]
@@ -144,7 +160,8 @@ model Report {
   location   Location?      @relation(fields: [locationId], references: [id], onDelete: Cascade)
   reporterId Int
   reporter   User           @relation(fields: [reporterId], references: [id], onDelete: Cascade)
-  resolvedAt DateTime?
+  closedAt   DateTime?
+  note       String?
   createdAt  DateTime       @default(now())
 }
 
@@ -158,4 +175,19 @@ model SavedLocation {
   createdAt  DateTime @default(now())
 
   @@unique([userId, locationId])
+}
+
+// Owner notification (report-resolution/08): snapshot of a moderation removal.
+// No FK to content — the name/category are copied at removal time so the notice
+// survives the content being soft-deleted (or later hard-deleted).
+model Notification {
+  id          Int              @id @default(autoincrement())
+  userId      Int
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  contentName String           // image originalName or location name
+  category    ReportCategory?
+  note        String?
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
 }

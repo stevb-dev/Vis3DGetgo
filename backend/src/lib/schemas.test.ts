@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createLocationSchema, nearbyQuerySchema, resolveQuerySchema, updateLocationSchema } from './schemas'
+import { createLocationSchema, nearbyQuerySchema, resolveQuerySchema, resolveReportSchema, updateLocationSchema } from './schemas'
 
 const valid = {
   name: 'Test Point',
@@ -109,5 +109,32 @@ describe('updateLocationSchema', () => {
   it('rejects invalid field values', () => {
     expect(() => updateLocationSchema.parse({ name: '  ' })).toThrow()
     expect(() => updateLocationSchema.parse({ description: 'x'.repeat(501) })).toThrow()
+  })
+})
+
+describe('resolveReportSchema', () => {
+  it('accepts DELETE and DISMISS with an optional note', () => {
+    expect(resolveReportSchema.parse({ action: 'DELETE' })).toEqual({ action: 'DELETE' })
+    expect(resolveReportSchema.parse({ action: 'DISMISS', note: 'not spam' })).toEqual({
+      action: 'DISMISS',
+      note: 'not spam',
+    })
+  })
+
+  it('trims the note', () => {
+    expect(resolveReportSchema.parse({ action: 'DISMISS', note: '  ok  ' })).toEqual({
+      action: 'DISMISS',
+      note: 'ok',
+    })
+  })
+
+  it('rejects an unknown action and a missing action', () => {
+    expect(() => resolveReportSchema.parse({ action: 'RESOLVE' })).toThrow()
+    expect(() => resolveReportSchema.parse({})).toThrow()
+    expect(() => resolveReportSchema.parse({ note: 'x' })).toThrow()
+  })
+
+  it('rejects an over-long note', () => {
+    expect(() => resolveReportSchema.parse({ action: 'DISMISS', note: 'x'.repeat(501) })).toThrow()
   })
 })

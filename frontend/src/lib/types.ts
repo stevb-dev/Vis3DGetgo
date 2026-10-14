@@ -122,13 +122,47 @@ export const REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = {
 export interface AdminReport {
   id: number
   category: ReportCategory
-  status: 'OPEN' | 'RESOLVED'
+  status: ReportStatus
   imageId: number | null
   locationId: number | null
   reporterId: number
-  resolvedAt: string | null
+  closedAt: string | null
+  note: string | null
   createdAt: string
-  image: { id: number; filePath: string; locationId: number } | null
-  location: { id: number; name: string } | null
+  image: { id: number; filePath: string; locationId: number; deletedAt: string | null } | null
+  location: { id: number; name: string; deletedAt: string | null } | null
   reporter: { id: number; username: string }
+}
+
+export type ReportStatus = 'OPEN' | 'RESOLVED' | 'DISMISSED'
+
+export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
+  OPEN: 'Open',
+  RESOLVED: 'Resolved',
+  DISMISSED: 'Dismissed',
+}
+
+/** Shape returned by GET /api/my-reports (report-resolution/07). */
+export interface MyReport {
+  id: number
+  category: ReportCategory
+  status: ReportStatus
+  imageId: number | null
+  locationId: number | null
+  closedAt: string | null
+  note: string | null
+  createdAt: string
+  image: { id: number; originalName: string; filePath: string; locationId: number; deletedAt: string | null } | null
+  location: { id: number; name: string; deletedAt: string | null } | null
+}
+
+/** Shape returned by GET /api/notifications (report-resolution/08). */
+export interface AppNotification {
+  id: number
+  type: 'MODERATION_REMOVAL'
+  contentName: string
+  category: ReportCategory | null
+  note: string | null
+  readAt: string | null
+  createdAt: string
 }

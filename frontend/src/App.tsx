@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import CreateLocationPage from './pages/CreateLocationPage'
 import AdminReportsPage from './pages/AdminReportsPage'
+import MyReportsPage from './pages/MyReportsPage'
 import SavedPage from './pages/SavedPage'
 import SlugResolver from './components/SlugResolver'
 
@@ -26,6 +27,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/locations/new" element={<CreateLocationPage />} />
           <Route path="/saved" element={<SavedPage />} />
+          <Route path="/my-reports" element={<MyReportsPage />} />
         </Route>
 
         <Route element={<AdminRoute />}>

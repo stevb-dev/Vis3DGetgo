@@ -23,7 +23,7 @@ router.post('/locations/:id/images', authenticate, uploadRateLimiter, (req, res,
   // Verify the location BEFORE multer consumes the body, so a 404 doesn't
   // read the whole multipart payload.
   prisma.location
-    .findUnique({ where: { id }, include: { _count: { select: { images: true } } } })
+    .findFirst({ where: { id, deletedAt: null }, include: { _count: { select: { images: { where: { deletedAt: null } } } } } })
     .then((location) => {
       if (!location) {
         return res.status(404).json({ error: 'Location not found' })
@@ -185,7 +185,7 @@ router.delete('/images/:id', authenticate, async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid id' })
     }
 
-    const image = await prisma.image.findUnique({ where: { id } })
+    const image = await prisma.image.findFirst({ where: { id, deletedAt: null } })
     if (!image) {
       return res.status(404).json({ error: 'Image not found' })
     }

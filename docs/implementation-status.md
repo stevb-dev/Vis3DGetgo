@@ -2,7 +2,7 @@
 
 Session log of everything built so far — what is implemented, how it was verified, and what remains open. The thesis can cite this file directly as a build log.
 
-> Last updated: 2026-10-13 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
+> Last updated: 2026-10-14 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
 
 ---
 
@@ -172,7 +172,39 @@ Semantic location search: local multilingual embeddings (e5-small) + pgvector, n
 
 **Verified**: 60 unit tests + typecheck green; live HTTP E2E (semantic matches incl. Macedonian). The backend image now carries the ~120MB quantized model + onnxruntime native deps. Pending: browser pass on the search UI.
 
-## 10. Bug ledger (root causes worth citing)
+## 10. Report resolution — `.scratch/report-resolution/` (8/8 resolved)
+
+Two-action admin moderation (**Delete content** / **Dismiss**) replacing the single Resolve button, with soft-delete, owner notifications, an admin unread badge, and a "My reports" view. Grilled 2026-10-14 (decisions: child-image OPEN reports auto-close on a location delete but their owners are *not* notified; badge counts live in dedicated endpoints; `seen` fires only on the Open tab).
+
+### Schema (migration `20261014010000_report_resolution`)
+- `ReportStatus` + `DISMISSED` (RESOLVED = content deleted, DISMISSED = no action); `Report.resolvedAt` → `closedAt` (rename, data preserved); `Report.note`.
+- Soft-delete: `Image.deletedAt`, `Location.deletedAt` (a location delete cascades `deletedAt` to child images; files stay on disk).
+- `User.lastSeenReportsAt` (admin unread watermark) + `Notification` (snapshot: `type`/`contentName`/`category`/`note`/`readAt`, no FK to content) + `NotificationType`.
+
+### Resolve endpoint (`routes/reports.ts`, `lib/schemas.ts`)
+- `PATCH /api/reports/:id` takes `{ action: DELETE|DISMISS, note? }` (`resolveReportSchema`).
+- **DISMISS** → `DISMISSED` + `closedAt` + note, no content change.
+- **DELETE** → soft-delete the target (image, or location + cascade to child images), clear the pinned thumbnail when it's the removed image, `RESOLVED` + note, auto-close same-target **and** child-image OPEN reports (no note), notify the acted-on target's owner (`MODERATION_REMOVAL`, snapshot of name + category + note; skipped when `userId` is null). All in one transaction.
+- `GET /api/reports?status=OPEN|CLOSED` (CLOSED = RESOLVED+DISMISSED, default OPEN). The moderation include deliberately does NOT filter soft-deleted targets.
+
+### Hidden content (`deletedAt` filtering, ticket 04)
+- Every read filters `deletedAt: null`: locations list/detail, `nearby`/`resolve`/`search` raw SQL, saved list, image upload/delete; the write paths (report/save/thumbnail/edit/delete) 404 on soft-deleted targets; the search backfill skips deleted rows.
+- Thumbnail resolution stays correct via the **pin-cleared-on-soft-delete** invariant (the `thumbnailImage` relation never points at deleted content).
+
+### Admin UI + badge (`pages/AdminReportsPage.tsx`, `components/Header.tsx`)
+- Per-report dropdown (Delete content / Dismiss) + confirm dialog + optional note; Open/Closed tabs via `?status=`; closed rows labeled Resolved/Dismissed with `closedAt`; "Open location" hidden for soft-deleted targets.
+- `GET /api/reports/unread-count` + `POST /api/reports/seen` (admin); badge on the Reports link (hidden at 0); `seen` fires only when the Open tab is active.
+
+### Reporter + owner views
+- `GET /api/my-reports` + `/my-reports` page (ProtectedRoute) + header link for all logged-in users; status + dismiss note rendered.
+- `GET /api/notifications` + `POST /api/notifications/read-all` + `GET /api/notifications/unread-count` (`routes/notifications.ts`); `NotificationBell.tsx` dropdown in the header with an unread badge; opening marks all read.
+
+### Tests & verification
+- **64 backend unit tests** (5 new: `resolveReportSchema`); backend `tsc` green.
+- **Live E2E (HTTP)** — 21 checks green: DELETE (soft-delete 404, list absence, sibling + child-image auto-close, owner notification, unread + read-all) and DISMISS (stays live, note shown to reporter), invalid action 400, report-on-deleted 404.
+- Frontend: `tsc` + vite build green. **Pending: interactive browser pass.**
+
+## 11. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -191,16 +223,15 @@ Semantic location search: local multilingual embeddings (e5-small) + pgvector, n
 | Lightbox: zooming after navigating slides jumped back to the first-opened image | The zoom toggle reInits embla, and `reActivate` merges the watched options OVER the preserved snap — so the `startIndex` still sitting in `opts` re-applied the originally-opened slide | Remove `startIndex` from the watched options; scroll to the clicked slide imperatively once in a `useLayoutEffect` (pre-paint). Without it, reInit keeps the current slide |
 | Lightbox: Escape also closed the sidebar (X closed only the lightbox) | Radix dismisses on Escape from a document-CAPTURE listener; by the time the keydown reached the sidebar's window-level Escape handler, React had committed `lightboxIndex = null`, so the sidebar treated it as its own close | Handle Escape inside the dialog: `onEscapeKeyDown` preventDefault (Radix stays out of it) + React `onKeyDown` that closes and `stopPropagation()`s so the window listener never sees the event |
 
-## 11. Remaining open work
+## 12. Remaining open work
 
-- `report-resolution` (0/8): report lifecycle + admin UI — grilled, not implemented.
 - `models-3d` (0/3): admin registration API, sourcing demo GLBs (needs human), R3F viewer.
 - `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads; 05: marker icons only (its *zoom* half is superseded by map-filters) — needs-info.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI (build-verified only).
+- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution (build-verified only).
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 12. Doc map
+## 13. Doc map
 
 | Doc | Purpose |
 |---|---|
