@@ -6,6 +6,7 @@ import multer from 'multer'
 import { prisma } from '../lib/prisma'
 import { config } from '../lib/config'
 import { modelFormatFromFilename, uploadModel } from '../lib/models'
+import { convertSpzToV4, isSpzV4 } from '../lib/spz'
 import { authenticate, requireAdmin } from '../middleware/authenticate'
 
 const router = Router()
@@ -60,7 +61,20 @@ async function handleModelUpload(req: Request, res: Response): Promise<void> {
   }
 
   const filename = `${uuidv4()}.${format === 'GLB' ? 'glb' : 'spz'}`
-  await fs.promises.writeFile(path.join(config.modelsDir, filename), file.buffer)
+
+  // The PlayCanvas SPZ parser reads only SPZ v4 — convert legacy (v1–3,
+  // gzip) uploads synchronously before storing (grilling 2026-10-17).
+  let data: Buffer = file.buffer
+  if (format === 'SPZ' && !isSpzV4(data)) {
+    try {
+      data = await convertSpzToV4(data)
+    } catch (err) {
+      console.warn('[models] SPZ v4 conversion failed:', err)
+      res.status(400).json({ error: 'Could not convert the SPZ file (corrupt or unsupported version)' })
+      return
+    }
+  }
+  await fs.promises.writeFile(path.join(config.modelsDir, filename), data)
 
   try {
     const model = await prisma.model.create({
@@ -68,7 +82,7 @@ async function handleModelUpload(req: Request, res: Response): Promise<void> {
         locationId,
         filename,
         filePath: `/models/${filename}`,
-        fileSize: file.size,
+        fileSize: data.length,
         format,
       },
     })

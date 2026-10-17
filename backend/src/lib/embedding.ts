@@ -8,7 +8,7 @@ const MODEL_ID = 'Xenova/multilingual-e5-small'
 // stage). The runtime has no network and must load it from the filesystem —
 // this keeps the "no internet after setup" thesis line.
 env.allowRemoteModels = false
-env.localModelPath = process.env.MODEL_PATH ?? '/app/models/embedding'
+env.localModelPath = process.env.MODEL_PATH ?? '/app/embedding'
 
 let extractorPromise: Promise<FeatureExtractionPipeline> | null = null
 

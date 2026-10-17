@@ -43,8 +43,10 @@ RUN npm run build
 
 RUN mkdir -p uploads models
 
-# Baked-in embedding model (loaded via env.localModelPath).
-COPY --from=model /model /app/models/embedding/Xenova/multilingual-e5-small
+# Baked-in embedding model (loaded via env.localModelPath). Lives at /app/embedding
+# (NOT /app/models) — /app/models is a bind-mounted runtime dir for 3D model files
+# and a mount would shadow anything baked there.
+COPY --from=model /model /app/embedding/Xenova/multilingual-e5-small
 
 EXPOSE 3000
 CMD ["sh", "scripts/entrypoint.sh"]

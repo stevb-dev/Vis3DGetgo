@@ -42,7 +42,7 @@ services:
       - ./backend/src:/app/src
       - ./backend/prisma:/app/prisma
       - uploads:/app/uploads
-      - models:/app/models
+      - ./backend/models:/app/models
     ports:
       - "3000:3000"
     healthcheck:
@@ -88,7 +88,7 @@ services:
     volumes:
       - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
       - uploads:/var/www/uploads:ro
-      - models:/var/www/models:ro
+      - ./backend/models:/var/www/models:ro
     depends_on:
       - api
       - frontend
@@ -98,7 +98,6 @@ services:
 volumes:
   postgres_data:
   uploads:
-  models:
 
 networks:
   thesis-net:

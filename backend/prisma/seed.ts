@@ -1,6 +1,10 @@
 import bcrypt from 'bcrypt'
-import { LocationCategory } from '@prisma/client'
+import fs from 'fs'
+import path from 'path'
+import { LocationCategory, ModelFormat } from '@prisma/client'
 import { prisma } from '../src/lib/prisma'
+import { config } from '../src/lib/config'
+import { convertSpzToV4, isSpzV4 } from '../src/lib/spz'
 
 interface DemoLocation {
   name: string
@@ -39,6 +43,22 @@ const demoLocations: DemoLocation[] = [
     longitude: 21.3015,
     category: LocationCategory.NATURE,
   },
+]
+
+interface DemoModel {
+  locationName: string
+  filename: string
+  format: ModelFormat
+}
+
+// Demo 3D models (`.scratch/models-3d/issues/02`). Files live in the bind-mounted
+// `backend/models/` dir (out of git); the seed registers the Model rows and reads
+// sizes from disk. Kale Fortress is deliberately left without a model so the
+// sidebar's "no model" state stays demonstrable.
+const demoModels: DemoModel[] = [
+  { locationName: 'Macedonia Square', filename: 'marble-bust.glb', format: 'GLB' },
+  { locationName: 'Stone Bridge', filename: 'stone-bridge.glb', format: 'GLB' },
+  { locationName: 'Matka Canyon', filename: 'racoonfamily.spz', format: 'SPZ' },
 ]
 
 async function main() {
@@ -99,6 +119,81 @@ async function main() {
   })
   if (pruned.count > 0) {
     console.log(`[seed] pruned ${pruned.count} stale demo location(s)`)
+  }
+
+  // ── Demo 3D models (`.scratch/models-3d/issues/02`) ────────────────────────
+  // Upsert the demo models, then prune any model on a seeded location that is no
+  // longer in the list — mirroring the location pruning above. A missing file is
+  // skipped (fresh clone without `backend/models/` still boots cleanly).
+  const modelFiles = demoModels.map((m) => m.filename)
+  for (const m of demoModels) {
+    const location = await prisma.location.findFirst({
+      where: { name: m.locationName, seeded: true },
+    })
+    if (!location) continue
+
+    const filePath = `/models/${m.filename}`
+    const fullPath = path.join(config.modelsDir, m.filename)
+
+    // The PlayCanvas SPZ parser reads only SPZ v4 — convert legacy (v1–3)
+    // demo files in place (grilling 2026-10-17). Idempotent: v4 files are
+    // left untouched, and a corrupt file skips the model.
+    if (m.format === 'SPZ') {
+      let buf: Buffer
+      try {
+        buf = await fs.promises.readFile(fullPath)
+      } catch {
+        console.log(`[seed] model file missing (skipped): ${m.filename}`)
+        continue
+      }
+      if (!isSpzV4(buf)) {
+        try {
+          const converted = await convertSpzToV4(buf)
+          await fs.promises.writeFile(fullPath, converted)
+          console.log(`[seed] converted demo model to SPZ v4: ${m.filename}`)
+        } catch (err) {
+          console.warn(`[seed] could not convert demo model (skipped): ${m.filename} —`, err)
+          continue
+        }
+      }
+    }
+
+    let fileSize = 0
+    try {
+      fileSize = (await fs.promises.stat(fullPath)).size
+    } catch {
+      console.log(`[seed] model file missing (skipped): ${m.filename}`)
+      continue
+    }
+
+    const existing = await prisma.model.findUnique({ where: { locationId: location.id } })
+    if (existing) {
+      if (existing.filename !== m.filename || existing.format !== m.format || existing.fileSize !== fileSize) {
+        await prisma.model.update({
+          where: { id: existing.id },
+          data: { filename: m.filename, filePath, fileSize, format: m.format },
+        })
+        console.log(`[seed] updated model: ${m.filename}`)
+      }
+      continue
+    }
+    await prisma.model.create({
+      data: { locationId: location.id, filename: m.filename, filePath, fileSize, format: m.format },
+    })
+    console.log(`[seed] created model: ${m.filename}`)
+  }
+
+  const seededIds = (
+    await prisma.location.findMany({ where: { seeded: true }, select: { id: true } })
+  ).map((l) => l.id)
+  const staleModels = await prisma.model.findMany({
+    where: { locationId: { in: seededIds }, filename: { notIn: modelFiles } },
+    select: { id: true, filename: true },
+  })
+  for (const m of staleModels) {
+    await prisma.model.delete({ where: { id: m.id } })
+    await fs.promises.rm(path.join(config.modelsDir, m.filename), { force: true }).catch(() => undefined)
+    console.log(`[seed] pruned stale model: ${m.filename}`)
   }
 }
 
