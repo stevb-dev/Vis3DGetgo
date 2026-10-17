@@ -28,6 +28,7 @@ import ImageDropzone from '@/components/ImageDropzone'
 import ImageCarousel from '@/components/ImageCarousel'
 import ReportDialog from '@/components/ReportDialog'
 import ModelViewerDialog from '@/components/ModelViewerDialog'
+import ModelControls from '@/components/ModelControls'
 
 const updateSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
@@ -379,15 +380,10 @@ export default function LocationSidebar() {
             </div>
           </section>
 
-          {loc.model && (
+          {(loc.model || user?.role === 'ADMIN') && (
             <section>
               <h3 className="text-sm font-semibold">3D model</h3>
-              <Button variant="outline" className="mt-2 w-full" onClick={() => setModelOpen(true)}>
-                View 3D model
-                <span className="ml-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase">
-                  {loc.model.format}
-                </span>
-              </Button>
+              <ModelControls location={loc} onView={() => setModelOpen(true)} />
             </section>
           )}
         </div>
