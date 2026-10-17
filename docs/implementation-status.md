@@ -233,30 +233,33 @@ Modal 3D viewer, grilling round (2026-10-14): modal-only (the sidebar shows a
 "View 3D model" button with a GLB/SPZ label), a single `ModelViewer` branching
 on `format`, orbit-only controls.
 
-- **GLB** → R3F `<Canvas>` + `GLTFLoader` (via `useLoader`) + `<Center>` scale-to-fit.
-- **SPZ** → `@mkkellogg/gaussian-splats-3d` `Viewer` (peer three ≥0.160, matches
-  0.160.1); disposed on unmount. New dep added to `frontend/package.json`.
-- **Lazy**: `React.lazy` + `<Suspense>` — the viewer (three/drei + splat lib)
-  ships as its own 1.14 MB chunk, off the critical path.
+- **GLB** → R3F `<Canvas>` + `GLTFLoader` (via `useLoader`) + `<Center>` scale-to-fit;
+  load failures are caught by an in-canvas `ErrorBoundary` (`components/ErrorBoundary.tsx`).
+- **SPZ** → the **PlayCanvas engine** (`playcanvas` npm): a `gsplat` entity loaded
+  through the `SpzParser` script (SPZ **v4** only, ZSTD wasm decoder vendored in
+  `frontend/public/wasm/`), orbit-only `CameraControls`, camera frame-fit to the
+  splat's AABB. `@mkkellogg/gaussian-splats-3d` was **removed** (frozen at 0.4.7,
+  reads SPZ ≤ v2 — see the migration note below).
+- **Lazy**: `React.lazy` + `<Suspense>` — the viewer (three/drei + PlayCanvas)
+  ships as its own ~2.9 MB chunk, off the critical path.
 - **Escape/close**: closes the modal without also closing the sidebar (same
   `stopPropagation` fix as the lightbox bug).
 - **Loading progress** (2026-10-14): a determinate bar + percentage replaces the
-  old indeterminate spinner (grilling round). SPZ drives it from
-  `addSplatScene`'s `onProgress` (Downloading → real %, Processing → indeterminate
-  sweep + "Processing…", since decompression isn't progress-reported); GLB drives
-  it from `GLTFLoader` byte progress via `useLoader`. The lazy-chunk `<Suspense>`
+  old indeterminate spinner (grilling round). GLB drives it from `GLTFLoader`
+  byte progress via `useLoader`; SPZ shows the indeterminate sweep (PlayCanvas
+  reports no byte progress for a single spz fetch). The lazy-chunk `<Suspense>`
   spinner is unchanged (dynamic import exposes no progress).
 - **Sidebar model controls** (2026-10-15): admin-only upload + delete in the
   sidebar's "3D model" section (`components/ModelControls.tsx`). Upload = single
   `.glb`/`.spz` file picker → `POST /api/models`; delete = confirm → `DELETE
   /api/models/:id`. The section renders for admins even with no model (to surface
   the upload); non-admins still see it only when a model exists.
-- `Model.format` added to the frontend `Model` type; `types/gaussian-splats-3d.d.ts`
-  declares the untyped lib.
+- `Model.format` added to the frontend `Model` type; the untyped PlayCanvas
+  engine scripts are declared in `types/playcanvas-scripts.d.ts`.
 
-**Verified**: `tsc` + `vite build` green (viewer code-split into a lazy chunk),
-dev server transforms the modules and resolves the splat dep (HTTP 200).
-Pending: interactive browser pass (needs real `.glb`/`.spz` — ticket 02).
+**Verified**: `tsc` + `vite build` green (viewer code-split into a lazy chunk);
+the v3→v4 upload conversion verified E2E (a v3 upload stores as v4).
+Pending: interactive browser pass (PlayCanvas rendering, progress, upload UI).
 
 ### Demo models (ticket 02)
 
@@ -266,7 +269,10 @@ converted obj→glb with an authored MTL), and `racoonfamily.spz` (SPZ, MIT —
 Niantic's official sample). Kale Fortress is deliberately left empty. Files live
 in `backend/models/` (gitignored) and are **bind-mounted** into the API/nginx
 containers (the `models` named volume was removed). The seed owns them — upsert +
-prune, mirroring the location seed — and skips any whose file is absent.
+prune, mirroring the location seed — and skips any whose file is absent. Demo
+rows carry `Model.seeded = true` (like `Location.seeded`), so the prune only
+touches seed-owned rows and an admin upload on a seeded location survives
+re-seeding (migration `20261018000000_model_seeded`).
 
 Two non-obvious follow-ons:
 - The `models` volume used to collide with the baked embedding model at

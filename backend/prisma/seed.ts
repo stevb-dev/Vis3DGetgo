@@ -4,7 +4,7 @@ import path from 'path'
 import { LocationCategory, ModelFormat } from '@prisma/client'
 import { prisma } from '../src/lib/prisma'
 import { config } from '../src/lib/config'
-import { convertSpzToV4, isSpzV4 } from '../src/lib/spz'
+import { convertSpzToV4, ensureSpzV4, isSpzV4 } from '../src/lib/spz'
 
 interface DemoLocation {
   name: string
@@ -135,59 +135,63 @@ async function main() {
     const filePath = `/models/${m.filename}`
     const fullPath = path.join(config.modelsDir, m.filename)
 
-    // The PlayCanvas SPZ parser reads only SPZ v4 — convert legacy (v1–3)
-    // demo files in place (grilling 2026-10-17). Idempotent: v4 files are
-    // left untouched, and a corrupt file skips the model.
-    if (m.format === 'SPZ') {
-      let buf: Buffer
-      try {
-        buf = await fs.promises.readFile(fullPath)
-      } catch {
-        console.log(`[seed] model file missing (skipped): ${m.filename}`)
-        continue
-      }
-      if (!isSpzV4(buf)) {
-        try {
-          const converted = await convertSpzToV4(buf)
-          await fs.promises.writeFile(fullPath, converted)
-          console.log(`[seed] converted demo model to SPZ v4: ${m.filename}`)
-        } catch (err) {
-          console.warn(`[seed] could not convert demo model (skipped): ${m.filename} —`, err)
-          continue
-        }
-      }
-    }
-
-    let fileSize = 0
+    // Read once. Legacy (v1–3) .spz demo files are converted to v4 in place —
+    // the PlayCanvas SPZ parser reads only v4 (grilling 2026-10-17). The
+    // conversion is idempotent; a missing or corrupt file skips the model.
+    let data: Buffer
     try {
-      fileSize = (await fs.promises.stat(fullPath)).size
+      data = await fs.promises.readFile(fullPath)
     } catch {
       console.log(`[seed] model file missing (skipped): ${m.filename}`)
       continue
     }
+    if (m.format === 'SPZ') {
+      const wasV4 = isSpzV4(data)
+      try {
+        data = await ensureSpzV4(data, fullPath)
+      } catch (err) {
+        console.warn(`[seed] could not convert demo model (skipped): ${m.filename} —`, err)
+        continue
+      }
+      if (!wasV4) console.log(`[seed] converted demo model to SPZ v4: ${m.filename}`)
+    }
 
     const existing = await prisma.model.findUnique({ where: { locationId: location.id } })
     if (existing) {
-      if (existing.filename !== m.filename || existing.format !== m.format || existing.fileSize !== fileSize) {
+      if (
+        existing.filename !== m.filename ||
+        existing.format !== m.format ||
+        existing.fileSize !== data.length ||
+        !existing.seeded
+      ) {
         await prisma.model.update({
           where: { id: existing.id },
-          data: { filename: m.filename, filePath, fileSize, format: m.format },
+          data: { filename: m.filename, filePath, fileSize: data.length, format: m.format, seeded: true },
         })
         console.log(`[seed] updated model: ${m.filename}`)
       }
       continue
     }
     await prisma.model.create({
-      data: { locationId: location.id, filename: m.filename, filePath, fileSize, format: m.format },
+      data: {
+        locationId: location.id,
+        filename: m.filename,
+        filePath,
+        fileSize: data.length,
+        format: m.format,
+        seeded: true,
+      },
     })
     console.log(`[seed] created model: ${m.filename}`)
   }
 
+  // Prune only the seed's OWN models (seeded = true) — an admin upload on a
+  // seeded location survives re-seeding.
   const seededIds = (
     await prisma.location.findMany({ where: { seeded: true }, select: { id: true } })
   ).map((l) => l.id)
   const staleModels = await prisma.model.findMany({
-    where: { locationId: { in: seededIds }, filename: { notIn: modelFiles } },
+    where: { seeded: true, locationId: { in: seededIds }, filename: { notIn: modelFiles } },
     select: { id: true, filename: true },
   })
   for (const m of staleModels) {

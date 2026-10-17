@@ -1,3 +1,4 @@
+import fs from 'fs'
 import {
   createChunkDataPool,
   MemoryFileSystem,
@@ -49,4 +50,19 @@ export async function convertSpzToV4(input: Buffer): Promise<Buffer> {
   } finally {
     source.close()
   }
+}
+
+/**
+ * Return the buffer as-is when it is already SPZ v4; otherwise convert it and,
+ * when a write path is given, persist the converted bytes there. Shared by the
+ * upload route (no write path — the caller stores under its own filename) and
+ * the seed (writes back in place).
+ */
+export async function ensureSpzV4(buffer: Buffer, writePath?: string): Promise<Buffer> {
+  if (isSpzV4(buffer)) return buffer
+  const converted = await convertSpzToV4(buffer)
+  if (writePath) {
+    await fs.promises.writeFile(writePath, converted)
+  }
+  return converted
 }

@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import * as pc from 'playcanvas'
 import { SpzParser } from 'playcanvas/scripts/esm/parsers/spz-parser.mjs'
 import { CameraControls } from 'playcanvas/scripts/esm/camera-controls.mjs'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import { Model } from '@/lib/types'
 
 // SPZ v4 attribute streams are ZSTD compressed — register the decoder module once
@@ -70,6 +71,7 @@ function ModelLoadProgress({ value, caption, indeterminate }: {
 function GlbViewer({ url }: { url: string }) {
   const [progress, setProgress] = useState(0)
   const [ready, setReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const markReady = useCallback(() => setReady(true), [])
 
   return (
@@ -77,14 +79,23 @@ function GlbViewer({ url }: { url: string }) {
       <Canvas camera={{ position: [0, 0, 4], fov: 45 }} className="h-full w-full">
         <ambientLight intensity={0.7} />
         <directionalLight position={[5, 5, 5]} intensity={1.4} />
-        <Suspense fallback={null}>
-          <Center>
-            <GlbModel url={url} onProgress={setProgress} onReady={markReady} />
-          </Center>
-        </Suspense>
+        {/* ErrorBoundary lives inside the Canvas: useLoader throws into the R3F
+            tree, which a DOM-level boundary would never see. */}
+        <ErrorBoundary onError={(err) => setError(err?.message || 'Could not load the 3D model')}>
+          <Suspense fallback={null}>
+            <Center>
+              <GlbModel url={url} onProgress={setProgress} onReady={markReady} />
+            </Center>
+          </Suspense>
+        </ErrorBoundary>
         <OrbitControls makeDefault enableDamping />
       </Canvas>
-      {!ready && <ModelLoadProgress value={progress} />}
+      {!ready && !error && <ModelLoadProgress value={progress} />}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-destructive">
+          {error}
+        </div>
+      )}
     </div>
   )
 }

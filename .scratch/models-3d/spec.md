@@ -12,7 +12,7 @@ Admin-only upload + unregister API, seed pipeline, viewer in the detail pane.
 
 ## Notes
 
-- Models live in the `/models` volume, served by nginx at `/models/*`.
+- Models live in the bind-mounted `backend/models/` dir, served by nginx at `/models/*`.
 - Budget: ≤50MB per file (`.spz` splats are far larger than GLB meshes).
 - `Model.locationId` is unique — one model per location (re-seeding happens via
   the seed script, ticket 02; the API 409s on an existing model).

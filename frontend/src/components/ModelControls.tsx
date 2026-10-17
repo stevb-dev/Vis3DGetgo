@@ -4,7 +4,7 @@ import { Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, ApiError } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import { Location } from '@/lib/types'
+import { Location, Model } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -15,6 +15,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+// Client pre-check mirrors the backend's MAX_MODEL_MB default (50, env-tunable):
+// it rejects obviously-bad files before uploading; the server enforces the real
+// limit anyway. Same pattern as ImageDropzone's MAX_MB — keep in sync with the
+// compose MAX_MODEL_MB if it changes.
 const MAX_MODEL_MB = 50
 const ALLOWED_EXTENSIONS = ['.glb', '.spz']
 
@@ -32,16 +36,20 @@ export default function ModelControls({ location, onView }: { location: Location
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  const invalidateLocation = () => {
+    queryClient.invalidateQueries({ queryKey: ['location', String(location.id)] })
+    queryClient.invalidateQueries({ queryKey: ['locations'] })
+  }
+
   const upload = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData()
       formData.append('locationId', String(location.id))
       formData.append('file', file)
-      return api.post<{ model: unknown }>('/models', formData)
+      return api.post<{ model: Model }>('/models', formData)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['location', String(location.id)] })
-      queryClient.invalidateQueries({ queryKey: ['locations'] })
+      invalidateLocation()
       toast.success('Model uploaded')
     },
     onError: (err) => {
@@ -56,8 +64,7 @@ export default function ModelControls({ location, onView }: { location: Location
     },
     onSuccess: () => {
       setConfirmDelete(false)
-      queryClient.invalidateQueries({ queryKey: ['location', String(location.id)] })
-      queryClient.invalidateQueries({ queryKey: ['locations'] })
+      invalidateLocation()
       toast.success('Model removed')
     },
     onError: (err) => {

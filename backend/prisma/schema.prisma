@@ -128,6 +128,10 @@ model Model {
   fileSize  Int
   // GLB (Draco mesh) or SPZ (3D Gaussian splat) — drives the viewer's renderer.
   format    ModelFormat
+  // Demo models are owned by the seed (like Location.seeded): the seed upserts
+  // them with seeded = true and prunes only flagged rows, so an admin upload on
+  // a seeded location survives re-seeding.
+  seeded    Boolean     @default(false)
   createdAt DateTime    @default(now())
 }
 
