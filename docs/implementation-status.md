@@ -2,7 +2,7 @@
 
 Session log of everything built so far — what is implemented, how it was verified, and what remains open. The thesis can cite this file directly as a build log.
 
-> Last updated: 2026-10-14 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
+> Last updated: 2026-10-18 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
 
 ---
 
@@ -204,7 +204,7 @@ Two-action admin moderation (**Delete content** / **Dismiss**) replacing the sin
 - **Live E2E (HTTP)** — 21 checks green: DELETE (soft-delete 404, list absence, sibling + child-image auto-close, owner notification, unread + read-all) and DISMISS (stays live, note shown to reporter), invalid action 400, report-on-deleted 404.
 - Frontend: `tsc` + vite build green. **Pending: interactive browser pass.**
 
-## 11. 3D models — `.scratch/models-3d/` (2/3)
+## 11. 3D models — `.scratch/models-3d/` (3/3)
 
 Admin model upload + unregister (ticket 01). Grilling round (2026-10-14) widened
 the original one-line spec: a single multipart endpoint, `.glb` + `.spz` (3D
@@ -233,19 +233,71 @@ Modal 3D viewer, grilling round (2026-10-14): modal-only (the sidebar shows a
 "View 3D model" button with a GLB/SPZ label), a single `ModelViewer` branching
 on `format`, orbit-only controls.
 
-- **GLB** → R3F `<Canvas>` + `useGLTF` (Draco via drei) + `<Center>` scale-to-fit.
+- **GLB** → R3F `<Canvas>` + `GLTFLoader` (via `useLoader`) + `<Center>` scale-to-fit.
 - **SPZ** → `@mkkellogg/gaussian-splats-3d` `Viewer` (peer three ≥0.160, matches
   0.160.1); disposed on unmount. New dep added to `frontend/package.json`.
 - **Lazy**: `React.lazy` + `<Suspense>` — the viewer (three/drei + splat lib)
   ships as its own 1.14 MB chunk, off the critical path.
 - **Escape/close**: closes the modal without also closing the sidebar (same
   `stopPropagation` fix as the lightbox bug).
+- **Loading progress** (2026-10-14): a determinate bar + percentage replaces the
+  old indeterminate spinner (grilling round). SPZ drives it from
+  `addSplatScene`'s `onProgress` (Downloading → real %, Processing → indeterminate
+  sweep + "Processing…", since decompression isn't progress-reported); GLB drives
+  it from `GLTFLoader` byte progress via `useLoader`. The lazy-chunk `<Suspense>`
+  spinner is unchanged (dynamic import exposes no progress).
+- **Sidebar model controls** (2026-10-15): admin-only upload + delete in the
+  sidebar's "3D model" section (`components/ModelControls.tsx`). Upload = single
+  `.glb`/`.spz` file picker → `POST /api/models`; delete = confirm → `DELETE
+  /api/models/:id`. The section renders for admins even with no model (to surface
+  the upload); non-admins still see it only when a model exists.
 - `Model.format` added to the frontend `Model` type; `types/gaussian-splats-3d.d.ts`
   declares the untyped lib.
 
 **Verified**: `tsc` + `vite build` green (viewer code-split into a lazy chunk),
 dev server transforms the modules and resolves the splat dep (HTTP 200).
 Pending: interactive browser pass (needs real `.glb`/`.spz` — ticket 02).
+
+### Demo models (ticket 02)
+
+Seeded 3 demo models (`.scratch/models-3d/issues/02`): `marble-bust.glb` (GLB,
+CC0 — Poly Haven "Marble Bust 01"), `stone-bridge.glb` (GLB, CC0 — OpenGameArt,
+converted obj→glb with an authored MTL), and `racoonfamily.spz` (SPZ, MIT —
+Niantic's official sample). Kale Fortress is deliberately left empty. Files live
+in `backend/models/` (gitignored) and are **bind-mounted** into the API/nginx
+containers (the `models` named volume was removed). The seed owns them — upsert +
+prune, mirroring the location seed — and skips any whose file is absent.
+
+Two non-obvious follow-ons:
+- The `models` volume used to collide with the baked embedding model at
+  `/app/models/embedding`; the embedding model moved to `/app/embedding`
+  (Dockerfile + `env.localModelPath`) so the bind-mount wouldn't shadow it. Search
+  re-verified (0.82 "castle" → Kale).
+- The Matka SPZ is a **placeholder** (raccoon-family subject). A real landscape
+  splat is 100s of MB and SuperSplat downloads are auth-gated — recorded as a
+  known follow-up.
+
+### PlayCanvas SPZ v4 migration (2026-10-17)
+
+`@mkkellogg/gaussian-splats-3d` (frozen at 0.4.7) rejects SPZ v3+ — the real
+Nikola Karev monument file was v3 and wouldn't load. The SPZ renderer was
+migrated to the **PlayCanvas engine** (`playcanvas` npm), which reads SPZ **v4**:
+
+- `ModelViewer.tsx`'s SPZ path is now a PlayCanvas `Application` (canvas +
+  camera + `CameraControls` script + `gsplat` entity), frame-fitting the camera
+  to the splat's bounding box. The GLB path (R3F) is unchanged.
+- The `SpzParser` and `CameraControls` scripts import from
+  `playcanvas/scripts/esm/…` (exported by the package); `types/playcanvas-scripts.d.ts`
+  declares them.
+- The ZSTD decoder WASM (`zstd.wasm.js`/`.wasm`) is vendored in
+  `frontend/public/wasm/` and registered via `WasmModule.setConfig`.
+- **v3→v4 conversion** (grilling): `POST /api/models` converts legacy (v1–3,
+  gzip) `.spz` uploads to v4 synchronously before storing (`lib/spz.ts`); the
+  seed converts non-v4 demo `.spz` files in place, idempotently. Conversion is
+  CPU-only (~1s/M gaussians) but RAM scales ~20× file size — a 50 MB upload is
+  memory-hungry in the API container (flagged).
+- The demo files (raccoon, monument) were converted to v4; uploads now
+  auto-convert, so Scaniverse/SuperSplat v3 files just work.
 
 ## 12. Bug ledger (root causes worth citing)
 
@@ -268,7 +320,7 @@ Pending: interactive browser pass (needs real `.glb`/`.spz` — ticket 02).
 
 ## 13. Remaining open work
 
-- `models-3d` (2/3): sourcing demo GLBs/SPZ (needs human, ticket 02).
+- `models-3d` (3/3): demo models seeded — but the Matka SPZ is a placeholder (Niantic raccoon sample); a real landscape splat remains a follow-up.
 - `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads; 05: marker icons only (its *zoom* half is superseded by map-filters) — needs-info.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
 - Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only).
