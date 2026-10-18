@@ -41,9 +41,17 @@ export default function App() {
             nested so entering/leaving it never remounts the map). The static
             "locations/new" segment ranks above the dynamic "locations/:id". */}
         <Route path="/" element={<MapPage />}>
-          <Route element={<ProtectedRoute />}>
-            <Route path="locations/new" element={<CreateLocationPanel />} />
-          </Route>
+          {/* Inline guard (not a layout route): a layout Outlet here would reset
+              useOutletContext for the panel — CreateLocationPanel reads MapPage's
+              <Outlet context> (picked spot + navigateMap). */}
+          <Route
+            path="locations/new"
+            element={
+              <ProtectedRoute>
+                <CreateLocationPanel />
+              </ProtectedRoute>
+            }
+          />
           <Route path="locations/:id" element={<LocationSidebar />} />
         </Route>
       </Routes>

@@ -35,6 +35,12 @@ this session (the picked pin's look). Build log: `docs/implementation-status.md`
   picks, and the picked `<Marker>` renders inside `MapContainer`. The ticket's
   "panel-local state" note is superseded by this — same transient semantics,
   still not in the URL.
+- **`useOutletContext` reads the *nearest* Outlet.** Wrapping the create route
+  in a `ProtectedRoute` layout route put ProtectedRoute's own `<Outlet>` (no
+  context) between MapPage's `<Outlet context>` and the panel — the panel
+  crashed destructuring `undefined`. `ProtectedRoute` now guards inline
+  (`children` passthrough; layout usage for other routes unchanged), so no
+  intermediate Outlet shadows the map's context. Bug-ledger §13.
 - The picked pin is the **category pin following the form's category
   selection** (new grilling decision this session): `form.watch('category')`
   in the panel pushes `setPickedCategory` through the Outlet context, so the
