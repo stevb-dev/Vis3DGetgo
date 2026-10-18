@@ -1,6 +1,6 @@
 # ADR-0002: Map interaction design (sidebar detail, tooltips, locate button)
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-10-18)
 - **Date:** 2026-09-27
 - **Deciders:** Thesis author (+ agent, via a grilling round using an interactive questionnaire)
 
@@ -30,7 +30,18 @@ The first version of the map opened a Leaflet popup on marker click *and* naviga
 - `sonner` added as a dependency (also planned for future upload-error feedback).
 - Seed data moved to Skopje; the seed script owns the demo dataset (prunes stale demo rows).
 
+## Amendment (2026-10-18, second grilling round)
+
+| # | Decision |
+|---|---|
+| A1 | **Per-category markers** replace the hue-rotated recolor (decision 3): a CSS-teardrop `divIcon` per `LocationCategory` — distinct Tailwind 500 hue + the category's white lucide icon (the chip icon); the selected pin is the stronger 600 shade, larger, with a white ring |
+| A2 | **Viewport lives in the URL**: `?lat=&lng=&zoom=` written on `moveend`/`zoomend` (`replace: true`, no history spam), read once on mount — a URL viewport beats geolocation; `?fly=1` still beats the restored viewport |
+| A3 | No Zustand map store: the URL is the single source of truth and nothing else consumes a store (the app's only store is auth) |
+| A4 | Zoom behavior stays as-is (fixed 13 + geolocation start + fly-to on selection) — the zoom half of ticket 05 is **wontfix** |
+
+Consequences: marker icons are HTML strings (lucide v0.447.0 SVG snapshots in `lib/markerIcons.ts`) so divIcons render outside the React tree; reloads now restore the last view; every pan/zoom rewrites the query string in place.
+
 ## Related
 
-- `.scratch/frontend-map/` (tickets 01–04)
+- `.scratch/frontend-map/` (tickets 01–05)
 - `docs/implementation-status.md` §4, §5

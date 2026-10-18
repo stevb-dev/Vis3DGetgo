@@ -55,11 +55,12 @@ Session log of everything built so far — what is implemented, how it was verif
 - **EXPLAIN ANALYZE evidence** (1000 benchmark rows, 500m radius): `Index Scan using idx_location_coords_geography` — 9 rows in ~9ms.
 - Frontend: create-location page (map click → pin → dialog form → 201 → navigate to the new location).
 
-## 4. Map & UI — `.scratch/frontend-map/` (01, 04 resolved; 02, 03 partial)
+## 4. Map & UI — `.scratch/frontend-map/` (5/5 resolved)
 
 - Leaflet + react-leaflet map, OSM tiles, markers from `GET /api/locations`, bundler-safe marker icons (`lib/leafletIcons.ts`).
-- **Sidebar detail** (`components/LocationSidebar.tsx`): nested route `/locations/:id` under the map page — the map stays mounted; close via X, **Escape**, **empty-map click**, or clicking the selected marker again (toggle).
-- **Selected marker** recolored via `.marker-selected` (hue-rotate + shadow).
+- **Sidebar detail** (`components/LocationSidebar.tsx`): nested route `/locations/:id` under the map page — the map stays mounted; close via X, **Escape**, **empty-map click**, or clicking the selected marker again (toggle). Loading **pulse skeleton**; errors get a distinct **404 state** ("Location not found" + Back to map, branched on `ApiError.status === 404`).
+- **Category pins** (`lib/markerIcons.ts`, 2026-10-18): per-category CSS teardrop `divIcon` — distinct Tailwind 500 hue per `LocationCategory` + the category's white lucide icon (SVG snapshots of v0.447.0, same icon as the filter chips). Selected pin = stronger 600 shade, larger, white ring; anchor stays on the pin point. Replaced the old `.marker-selected` hue-rotate recolor.
+- **Viewport in the URL** (2026-10-18): `?lat=&lng=&zoom=` written on `moveend`/`zoomend` (`ViewportPersist`, `{ replace: true }`), parsed once on mount (`parseViewport`, piece-wise fallback to geolocation/Skopje). URL viewport beats geolocation; `?fly=1` still beats the restored viewport. Carried across marker-click navigation with `category`/`layer`.
 - **Hover tooltip**: name + thumbnail (from the list endpoint's `thumbnail` field); name-only while a location has no images.
 - **Locate button** (`components/LocateButton.tsx`, both maps): one-shot recenter (`getCurrentPosition`, 5s timeout), `flyTo` at `max(zoom, 15)`, temporary pulsing "you are here" dot (36px, 5s), spinner while locating, failures via **sonner** toasts. Button clicks/scroll don't leak to the map (`L.DomEvent.disable*Propagation`).
 - **Map start**: browser geolocation when granted, else Skopje (`41.9973, 21.428`) — `hooks/useMapCenter.ts` + `Recenter` effect (react-leaflet ignores center changes after mount).
@@ -323,13 +324,15 @@ migrated to the **PlayCanvas engine** (`playcanvas` npm), which reads SPZ **v4**
 | Lightbox: zoom dead everywhere after the content-level capture rewrite | Native capture-phase listeners on the Radix dialog content proved unreliable (interplay with Radix/embla's own listeners) | Dropped ALL native listeners: plain React `onPointer*` handlers on each slide, with embla's drag watching disabled while zoomed via the `watchDrag` option — embla-react reInits on option change and preserves the selected slide (verified in its source) |
 | Lightbox: zooming after navigating slides jumped back to the first-opened image | The zoom toggle reInits embla, and `reActivate` merges the watched options OVER the preserved snap — so the `startIndex` still sitting in `opts` re-applied the originally-opened slide | Remove `startIndex` from the watched options; scroll to the clicked slide imperatively once in a `useLayoutEffect` (pre-paint). Without it, reInit keeps the current slide |
 | Lightbox: Escape also closed the sidebar (X closed only the lightbox) | Radix dismisses on Escape from a document-CAPTURE listener; by the time the keydown reached the sidebar's window-level Escape handler, React had committed `lightboxIndex = null`, so the sidebar treated it as its own close | Handle Escape inside the dialog: `onEscapeKeyDown` preventDefault (Radix stays out of it) + React `onKeyDown` that closes and `stopPropagation()`s so the window listener never sees the event |
+| Whole map rendered as light-blue ocean on every fresh load (Gulf of Guinea) | `parseViewport` did `Number(params.get('lat'))` — `Number(null)` is `0`, not `NaN`, so an absent viewport param parsed as center `[0, 0]` (null island) and overrode the geolocation start | `readNumberParam`: missing/empty/non-numeric → `null`, so absent params fall through to geolocation → Skopje. Regression loop: `scripts/verify-map-render.ps1` (headless Edge screenshots a fresh `/`; fails when water color dominates the map area) |
 
 ## 13. Remaining open work
 
 - `models-3d` (3/3): demo models seeded — but the Matka SPZ is a placeholder (Niantic raccoon sample); a real landscape splat remains a follow-up.
-- `frontend-map` 02 (partial): 3D viewer pane in the sidebar (carousel + upload are done — images/04); 03 (partial): viewport persistence across reloads; 05: marker icons only (its *zoom* half is superseded by map-filters) — needs-info.
+- `frontend-map` (5/5, 2026-10-18): closed out — 02 skeleton + 404, 03 viewport persistence in the URL, 05 per-category pins (zoom half wontfix).
+- `create-location-flow` (0/3): nested create route, create-mode map + panel, cancel/post-create — all ready-for-agent.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only).
+- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only); the new category pins + viewport-in-URL also need a click-through.
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
 ## 14. Doc map
