@@ -172,12 +172,30 @@ function SplatViewer({ url }: { url: string }) {
       camera.addComponent('camera', { clearColor: new pc.Color(0.08, 0.08, 0.1) })
       app.root.addChild(camera)
 
-      // Frame the camera on the splat's AABB (fall back to a fixed pose).
-      const aabb = gsplat?.instance?.meshInstance.aabb
-      const center = aabb ? aabb.center.clone() : new pc.Vec3()
-      if (aabb) {
-        const radius = aabb.halfExtents.length()
-        camera.setPosition(center.x, center.y, center.z + Math.max(radius * 2.5, 0.5))
+      // Frame the camera on the splat's AABB. The gsplat component is
+      // "unified" by default, so `gsplat.instance` is undefined — the bounds
+      // must come from `customAabb` (falls through to the resource's
+      // parse-time AABB). A degenerate AABB counts as missing.
+      const aabb =
+        gsplat?.customAabb ?? (asset.resource as { aabb?: pc.BoundingBox } | null)?.aabb ?? null
+      const radius = aabb ? aabb.halfExtents.length() : 0
+      const center = aabb && radius > 0 ? aabb.center.clone() : new pc.Vec3()
+      if (aabb && radius > 0) {
+        // True fit: distance that keeps the bounding sphere inside the
+        // viewport, limited by the tighter of the vertical fov and the
+        // aspect-scaled horizontal fov, with a small margin. Slight elevation
+        // gives a 3/4 view instead of a dead-level stare.
+        const fov = (((camera.camera?.fov ?? 45) * Math.PI) / 180)
+        const aspect = app.graphicsDevice.width / Math.max(1, app.graphicsDevice.height)
+        const horizontalHalf = Math.atan(Math.tan(fov / 2) * aspect)
+        const halfAngle = Math.min(fov / 2, horizontalHalf)
+        const distance = (radius / Math.sin(halfAngle)) * 1.1
+        const elevation = (18 * Math.PI) / 180
+        camera.setPosition(
+          center.x,
+          center.y + Math.sin(elevation) * distance,
+          center.z + Math.cos(elevation) * distance,
+        )
         camera.lookAt(center)
       } else {
         camera.setPosition(0, 0, 2.5)
