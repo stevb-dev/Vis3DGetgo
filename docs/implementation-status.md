@@ -62,7 +62,7 @@ Session log of everything built so far — what is implemented, how it was verif
 - **Category pins** (`lib/markerIcons.ts`, 2026-10-18): per-category CSS teardrop `divIcon` — distinct Tailwind 500 hue per `LocationCategory` + the category's white lucide icon (SVG snapshots of v0.447.0, same icon as the filter chips). Selected pin = stronger 600 shade, larger, white ring; anchor stays on the pin point. Replaced the old `.marker-selected` hue-rotate recolor.
 - **Viewport in the URL** (2026-10-18): `?lat=&lng=&zoom=` written on `moveend`/`zoomend` (`ViewportPersist`, `{ replace: true }`), parsed once on mount (`parseViewport`, piece-wise fallback to geolocation/Skopje). URL viewport beats geolocation; `?fly=1` still beats the restored viewport. Carried across marker-click navigation with `category`/`layer`.
 - **Hover tooltip**: name + thumbnail (from the list endpoint's `thumbnail` field); name-only while a location has no images.
-- **Locate button** (`components/LocateButton.tsx`, both maps): one-shot recenter (`getCurrentPosition`, 5s timeout), `flyTo` at `max(zoom, 15)`, temporary pulsing "you are here" dot (36px, 5s), spinner while locating, failures via **sonner** toasts. Button clicks/scroll don't leak to the map (`L.DomEvent.disable*Propagation`).
+- **Locate button** (`components/LocateButton.tsx`): one-shot recenter (`getCurrentPosition`, 5s timeout), `flyTo` at `max(zoom, 15)`, temporary pulsing "you are here" dot (36px, 5s), spinner while locating, failures via **sonner** toasts. Button clicks/scroll don't leak to the map (`L.DomEvent.disable*Propagation`). (Used to be "both maps"; there is a single map now — create-location-flow nests the create flow under `MapPage`.)
 - **Map start**: browser geolocation when granted, else Skopje (`41.9973, 21.428`) — `hooks/useMapCenter.ts` + `Recenter` effect (react-leaflet ignores center changes after mount).
 - Design decisions: `docs/adr/0002-map-interaction-design.md` (grilling round).
 
@@ -306,7 +306,40 @@ migrated to the **PlayCanvas engine** (`playcanvas` npm), which reads SPZ **v4**
 - The demo files (raccoon, monument) were converted to v4; uploads now
   auto-convert, so Scaniverse/SuperSplat v3 files just work.
 
-## 12. Bug ledger (root causes worth citing)
+## 12. Create-location flow — `.scratch/create-location-flow/` (3/3 resolved)
+
+Grilling-round design (2026-10-15): the create flow nests under the map so the
+viewport never resets, with a side-panel form, explicit cancel, and a
+discard prompt.
+
+- **Nested route** (`App.tsx`): `/locations/new` is a child of the `/` map
+  route, wrapped in `ProtectedRoute` (guests still redirect to login). The
+  static segment ranks above `locations/:id`. `CreateLocationPage` (own
+  `MapContainer` — the viewport-reset root cause) is deleted; the flow is
+  `components/CreateLocationPanel.tsx` via the map's `<Outlet>`. The single
+  live map survives entering/leaving, so the viewport is preserved by
+  construction.
+- **Create mode** (`MapPage.tsx`): `isCreateMode = useMatch('/locations/new')`
+  guards the `:id` match (`"new"` → NaN), hides markers/search/chips and the
+  empty-state pill, and swaps `MapClickHandler` (close sidebar) for
+  `CreateClickCatcher` (pick a spot). Tile switcher + locate button stay.
+  Transient picked state lives in `MapPage` and is shared with the panel via
+  `<Outlet context>` — the picked marker renders inside `MapContainer` while
+  the panel sits outside it, so the panel cannot hold that state itself.
+- **Panel** (`CreateLocationPanel.tsx`): pre-pick hint ("Click the map to
+  choose a spot") + Cancel; post-pick, a pin drops at the picked spot and the
+  form (name/description/category + "Pinned at lat,lng") fills the panel.
+  Re-clicking the map moves the pin, form values preserved. The picked pin is
+  the **category pin following the form's category selection** (grilling
+  decision, 2026-10-18) — selected-style (ringed), recolors live as the
+  dropdown changes.
+- **Cancel + post-create**: Cancel/X/Escape → `/` preserving `?category=`,
+  `?layer=` and the viewport (`navigateMap` via Outlet context). A discard
+  prompt fires when name/description is non-empty or category ≠ `MONUMENTS`.
+  Successful create → `/locations/:id` **without** `?fly=1` (no recenter) —
+  the new pin is already under the view. `['locations']` invalidated.
+
+## 13. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -326,16 +359,16 @@ migrated to the **PlayCanvas engine** (`playcanvas` npm), which reads SPZ **v4**
 | Lightbox: Escape also closed the sidebar (X closed only the lightbox) | Radix dismisses on Escape from a document-CAPTURE listener; by the time the keydown reached the sidebar's window-level Escape handler, React had committed `lightboxIndex = null`, so the sidebar treated it as its own close | Handle Escape inside the dialog: `onEscapeKeyDown` preventDefault (Radix stays out of it) + React `onKeyDown` that closes and `stopPropagation()`s so the window listener never sees the event |
 | Whole map rendered as light-blue ocean on every fresh load (Gulf of Guinea) | `parseViewport` did `Number(params.get('lat'))` — `Number(null)` is `0`, not `NaN`, so an absent viewport param parsed as center `[0, 0]` (null island) and overrode the geolocation start | `readNumberParam`: missing/empty/non-numeric → `null`, so absent params fall through to geolocation → Skopje. Regression loop: `scripts/verify-map-render.ps1` (headless Edge screenshots a fresh `/`; fails when water color dominates the map area) |
 
-## 13. Remaining open work
+## 14. Remaining open work
 
 - `models-3d` (3/3): demo models seeded — but the Matka SPZ is a placeholder (Niantic raccoon sample); a real landscape splat remains a follow-up.
 - `frontend-map` (5/5, 2026-10-18): closed out — 02 skeleton + 404, 03 viewport persistence in the URL, 05 per-category pins (zoom half wontfix).
-- `create-location-flow` (0/3): nested create route, create-mode map + panel, cancel/post-create — all ready-for-agent.
+- `create-location-flow` (3/3, 2026-10-18): nested route + panel + cancel; the authenticated click-through is pending.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only); the new category pins + viewport-in-URL also need a click-through.
+- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only); the new category pins + viewport-in-URL + create flow also need a click-through.
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 14. Doc map
+## 15. Doc map
 
 | Doc | Purpose |
 |---|---|

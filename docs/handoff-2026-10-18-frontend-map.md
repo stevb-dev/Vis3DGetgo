@@ -55,7 +55,7 @@ start. Fix: `readNumberParam` treats missing/empty/non-numeric as absent.
 Reproduced red / verified green with a headless-Edge screenshot loop, now
 `scripts/verify-map-render.ps1` (Windows PowerShell; pixel-checks a fresh `/`
 shows land, not the liberty water fill). Root cause in
-`docs/implementation-status.md` §12.
+`docs/implementation-status.md` §13.
 
 ## Verification state
 

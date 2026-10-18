@@ -1,6 +1,6 @@
 # 01: Nest the create route under the map
 
-Status: ready-for-agent
+Status: resolved
 Feature: create-location-flow
 
 ## Context
@@ -13,18 +13,18 @@ with no jump.
 
 ## Requirements
 
-- [ ] In `App.tsx`, move the create route under the map route: add
+- [x] In `App.tsx`, move the create route under the map route: add
       `<Route path="locations/new" element={<CreateLocationPanel />} />` (wrapped
       in `ProtectedRoute` so guests are still redirected to login) as a child of
       the `/` route, removing the top-level `/locations/new` route. (The static
       segment `locations/new` ranks above the dynamic `locations/:id`, so the
       right component renders.)
-- [ ] Replace `pages/CreateLocationPage.tsx` with a `CreateLocationPanel`
+- [x] Replace `pages/CreateLocationPage.tsx` with a `CreateLocationPanel`
       component rendered via the map's `<Outlet />` (no `MapContainer` of its own).
-- [ ] `MapPage`: add `isCreateMode = useMatch('/locations/new')`; when set, don't
+- [x] `MapPage`: add `isCreateMode = useMatch('/locations/new')`; when set, don't
       compute a selected id from the `:id` match (guard against `"new"` → `NaN`).
-- [ ] Keep `MapPage`'s `Recenter`/`useMapCenter` unchanged (initial center only).
-- [ ] Header "New location" link still navigates to `/locations/new`, preserving
+- [x] Keep `MapPage`'s `Recenter`/`useMapCenter` unchanged (initial center only).
+- [x] Header "New location" link still navigates to `/locations/new`, preserving
       `?layer=` (no center/zoom params needed).
 
 ## Notes
@@ -35,3 +35,5 @@ with no jump.
   empty-click behaviour switch (ticket 02).
 
 ## Comments
+
+- 2026-10-18 (agent): Implemented. `App.tsx` nests `locations/new` under the map route inside a `ProtectedRoute` layout route (guest redirect verified headlessly: `/locations/new` lands on `/login`); `pages/CreateLocationPage.tsx` deleted in favour of `components/CreateLocationPanel.tsx` rendered via `<Outlet context>`; `MapPage` guards `selectedId` with `isCreateMode` (`useMatch('/locations/new')`), swaps `MapClickHandler` for `CreateClickCatcher`, and resets the picked spot when leaving create mode. `Recenter`/`useMapCenter` untouched; the Header link was already carrying `?layer=` only. Verified by `tsc` + vite build + the null-island regression script; authenticated click-through pending.

@@ -10,7 +10,7 @@
 #
 # That failure mode was the Number(null) === 0 bug (2026-10-18): parseViewport
 # treated absent ?lat=/?lng= params as 0 and overrode the geolocation start.
-# See .scratch/frontend-map/issues/03 and docs/implementation-status.md section 12.
+# See .scratch/frontend-map/issues/03 and docs/implementation-status.md section 13.
 #
 # Windows-only (Edge + System.Drawing). Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-map-render.ps1

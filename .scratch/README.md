@@ -9,8 +9,8 @@ Local-markdown tracker. Conventions: `docs/agents/issue-tracker.md`; statuses: `
 | `auth` | [spec](auth/spec.md) | 5 / 5 | Full JWT auth end-to-end (see ADR-0001) |
 | `infra` | [spec](infra/spec.md) | 3 / 3 | Docker, nginx, healthchecks, backups |
 | `locations` | [spec](locations/spec.md) | 4 / 4 | CRUD + PostGIS nearby (geography GIST index) + edit/delete permission model |
-| `create-location-flow` | [spec](create-location-flow/spec.md) | 0 / 3 | Nest create route under the map (viewport preserved), side-panel form, cancel + discard confirm — grilling done 2026-10-15 |
-| `frontend-map` | [spec](frontend-map/spec.md) | 2 / 5 | 01 markers (resolved), 04 locate button (resolved); 02/03 partial; 05 future TODO (needs-info) |
+| `create-location-flow` | [spec](create-location-flow/spec.md) | 3 / 3 | Nest create route under the map (viewport preserved), side-panel form, cancel + discard confirm — implemented 2026-10-18 |
+| `frontend-map` | [spec](frontend-map/spec.md) | 5 / 5 | Markers, sidebar detail, URL viewport, locate button, per-category pins — closed out 2026-10-18 |
 | `images` | [spec](images/spec.md) | 4 / 4 | Upload pipeline + carousel + delete + reports + admin thumbnail pinning |
 | `report-resolution` | [spec](report-resolution/spec.md) | 8 / 8 | Two-action admin resolution (Delete/Dismiss) + soft-delete + notifications + My reports — implemented 2026-10-14 |
 | `models-3d` | [spec](models-3d/spec.md) | 3 / 3 | Admin API + viewer + demo models seeded (2 GLB + 1 SPZ); SPZ v4 PlayCanvas migration 2026-10-17 |
