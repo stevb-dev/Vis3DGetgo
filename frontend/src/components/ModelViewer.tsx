@@ -123,7 +123,7 @@ function GlbModel({ url, onProgress, onReady }: {
 /** Keep the percentile pass under this many sampled points (sort cost). */
 const MAX_FRAME_SAMPLES = 250_000
 /** Frame sphere radius = this quantile of distances from the median point. */
-const FRAME_DISTANCE_QUANTILE = 0.75
+const FRAME_DISTANCE_QUANTILE = 0.25
 
 /**
  * Outlier-robust frame for the initial camera pose. Real scans are radially
