@@ -25,3 +25,5 @@ Description becomes a subtitle under the title with a 2-line clamp + "Show more"
 ## Comments
 
 - 2026-10-13 (agent): Rewrote `LocationSidebar.tsx` to the new order — sticky header (title + clamped description subtitle + Save/Share/Edit/Delete/Report/Close actions) → meta (badge + category label) → Images (carousel above dropzone) → 3D model (`min-h-[320px]`, hidden when `loc.model` is null). Description is a `ClampedText` component measuring `scrollHeight > clientHeight` for the Show more/less toggle. Edit form gained a category `<select>` (new `ui/select.tsx` native select). Verified by frontend build.
+
+- 2026-10-18 (agent, follow-up): Header actions moved per user request — only the Close button stays in the sticky header; Save/Share/Edit/Delete/Report now sit in a row below the category label (below the edit form while editing). Every icon button (including Close) gained a tooltip naming its action via a new Radix tooltip primitive (`ui/tooltip.tsx`, `@radix-ui/react-tooltip`; z-index raised above Leaflet like `ui/dialog.tsx`). Native `title` attributes removed in favor of the tooltips; `aria-label`s kept. Verified by frontend build (`tsc` + vite).

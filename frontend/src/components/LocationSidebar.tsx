@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ImageDropzone from '@/components/ImageDropzone'
 import ImageCarousel from '@/components/ImageCarousel'
 import ReportDialog from '@/components/ReportDialog'
@@ -221,236 +222,273 @@ export default function LocationSidebar() {
   }
 
   return (
-    <aside className="flex h-[calc(100vh-3.5rem)] w-96 shrink-0 flex-col overflow-y-auto border-l bg-card">
-      <div className="sticky top-0 z-10 border-b bg-card/95 px-4 py-3 backdrop-blur">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold">{loc?.name ?? 'Location'}</h2>
-            {loc && !editing && loc.description && <ClampedText text={loc.description} />}
+    <TooltipProvider delayDuration={200}>
+      <aside className="flex h-[calc(100vh-3.5rem)] w-96 shrink-0 flex-col overflow-y-auto border-l bg-card">
+        <div className="sticky top-0 z-10 border-b bg-card px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-semibold">{loc?.name ?? 'Location'}</h2>
+              {loc && !editing && loc.description && <ClampedText text={loc.description} />}
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Close" onClick={() => navigate('/')}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Close</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {loc && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={isSaved ? 'Unsave location' : 'Save location'}
-                  title={isSaved ? 'Unsave' : 'Save'}
-                  disabled={saveMutation.isPending}
-                  onClick={handleSave}
-                >
-                  <Bookmark className={cn('h-4 w-4', isSaved && 'fill-current')} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Share location"
-                  title="Copy share link"
-                  onClick={handleShare}
-                >
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-            {permission && !editing && (
-              <>
-                <Button variant="ghost" size="icon" aria-label="Edit location" title="Edit location" onClick={startEdit}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Delete location"
-                  title="Delete location"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-            {user && loc && loc.userId !== user.id && !editing && (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Report location"
-                title="Report location"
-                onClick={() => setReportOpen(true)}
-              >
-                <Flag className="h-4 w-4" />
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" aria-label="Close" onClick={() => navigate('/')}>
-              <X className="h-4 w-4" />
+        </div>
+
+        {/* Loading skeleton: mirrors the sidebar's sections (header, meta,
+            images, 3D model) so the layout doesn't jump when data arrives. */}
+        {isLoading && (
+          <div className="animate-pulse space-y-5 p-4" aria-busy="true">
+            <div className="space-y-2">
+              <div className="h-4 w-2/3 rounded bg-muted" />
+              <div className="h-3 w-full rounded bg-muted" />
+              <div className="h-3 w-4/5 rounded bg-muted" />
+            </div>
+            <div className="h-6 w-24 rounded-md bg-muted" />
+            <div className="space-y-2">
+              <div className="h-3.5 w-16 rounded bg-muted" />
+              <div className="h-40 w-full rounded-md bg-muted" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-3.5 w-20 rounded bg-muted" />
+              <div className="h-16 w-full rounded-md bg-muted" />
+            </div>
+          </div>
+        )}
+
+        {isError && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+            <p className="text-sm font-semibold">
+              {error instanceof ApiError && error.status === 404
+                ? 'Location not found'
+                : 'Could not load this location'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {error instanceof ApiError && error.status === 404
+                ? 'It may have been removed, or the link is wrong.'
+                : error instanceof ApiError
+                  ? error.message
+                  : 'Something went wrong. Please try again.'}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => navigate('/')}>
+              Back to map
             </Button>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Loading skeleton: mirrors the sidebar's sections (header, meta,
-          images, 3D model) so the layout doesn't jump when data arrives. */}
-      {isLoading && (
-        <div className="animate-pulse space-y-5 p-4" aria-busy="true">
-          <div className="space-y-2">
-            <div className="h-4 w-2/3 rounded bg-muted" />
-            <div className="h-3 w-full rounded bg-muted" />
-            <div className="h-3 w-4/5 rounded bg-muted" />
-          </div>
-          <div className="h-6 w-24 rounded-md bg-muted" />
-          <div className="space-y-2">
-            <div className="h-3.5 w-16 rounded bg-muted" />
-            <div className="h-40 w-full rounded-md bg-muted" />
-          </div>
-          <div className="space-y-2">
-            <div className="h-3.5 w-20 rounded bg-muted" />
-            <div className="h-16 w-full rounded-md bg-muted" />
-          </div>
-        </div>
-      )}
+        {loc && (
+          <div className="space-y-5 p-4">
+            {editing ? (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(saveEdit)} className="space-y-3" noValidate>
+                  {editError && (
+                    <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+                      {editError}
+                    </p>
+                  )}
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea rows={4} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <FormControl>
+                          <Select {...field}>
+                            {LOCATION_CATEGORIES.map((cat) => (
+                              <option key={cat} value={cat}>
+                                {LOCATION_CATEGORY_LABELS[cat]}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" size="sm" disabled={form.formState.isSubmitting}>
+                      {form.formState.isSubmitting ? 'Saving…' : 'Save'}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  <CategoryIcon category={loc.category} className="h-3.5 w-3.5" />
+                  {LOCATION_CATEGORY_LABELS[loc.category]}
+                </span>
+              </div>
+            )}
 
-      {isError && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-          <p className="text-sm font-semibold">
-            {error instanceof ApiError && error.status === 404
-              ? 'Location not found'
-              : 'Could not load this location'}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {error instanceof ApiError && error.status === 404
-              ? 'It may have been removed, or the link is wrong.'
-              : error instanceof ApiError
-                ? error.message
-                : 'Something went wrong. Please try again.'}
-          </p>
-          <Button variant="outline" size="sm" onClick={() => navigate('/')}>
-            Back to map
-          </Button>
-        </div>
-      )}
-
-      {loc && (
-        <div className="space-y-5 p-4">
-          {editing ? (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(saveEdit)} className="space-y-3" noValidate>
-                {editError && (
-                  <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-                    {editError}
-                  </p>
-                )}
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea rows={4} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <FormControl>
-                        <Select {...field}>
-                          {LOCATION_CATEGORIES.map((cat) => (
-                            <option key={cat} value={cat}>
-                              {LOCATION_CATEGORY_LABELS[cat]}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
-                    Cancel
+            <div className="flex flex-wrap items-center justify-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 [&_svg]:size-5"
+                    aria-label={isSaved ? 'Unsave location' : 'Save location'}
+                    disabled={saveMutation.isPending}
+                    onClick={handleSave}
+                  >
+                    <Bookmark className={cn('h-5 w-5', isSaved && 'fill-current')} />
                   </Button>
-                  <Button type="submit" size="sm" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? 'Saving…' : 'Save'}
+                </TooltipTrigger>
+                <TooltipContent>{isSaved ? 'Unsave location' : 'Save location'}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 [&_svg]:size-5"
+                    aria-label="Share location"
+                    onClick={handleShare}
+                  >
+                    <Share2 className="h-5 w-5" />
                   </Button>
-                </div>
-              </form>
-            </Form>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                <CategoryIcon category={loc.category} className="h-3.5 w-3.5" />
-                {LOCATION_CATEGORY_LABELS[loc.category]}
-              </span>
+                </TooltipTrigger>
+                <TooltipContent>Copy share link</TooltipContent>
+              </Tooltip>
+              {permission && !editing && (
+                <>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 [&_svg]:size-5"
+                        aria-label="Edit location"
+                        onClick={startEdit}
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit location</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 [&_svg]:size-5"
+                        aria-label="Delete location"
+                        onClick={() => setDeleteOpen(true)}
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete location</TooltipContent>
+                  </Tooltip>
+                </>
+              )}
+              {user && loc && loc.userId !== user.id && !editing && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 [&_svg]:size-5"
+                      aria-label="Report location"
+                      onClick={() => setReportOpen(true)}
+                    >
+                      <Flag className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Report location</TooltipContent>
+                </Tooltip>
+              )}
             </div>
-          )}
 
-          <section>
-            <h3 className="text-sm font-semibold">Images</h3>
-            <div className="mt-2 space-y-3">
-              <ImageCarousel
-                location={loc}
-                lightboxIndex={lightboxIndex}
-                onLightboxIndexChange={setLightboxIndex}
-              />
-              <ImageDropzone location={loc} />
-            </div>
-          </section>
-
-          {(loc.model || user?.role === 'ADMIN') && (
             <section>
-              <h3 className="text-sm font-semibold">3D model</h3>
-              <ModelControls location={loc} onView={() => setModelOpen(true)} />
+              <h3 className="text-sm font-semibold">Images</h3>
+              <div className="mt-2 space-y-3">
+                <ImageCarousel
+                  location={loc}
+                  lightboxIndex={lightboxIndex}
+                  onLightboxIndexChange={setLightboxIndex}
+                />
+                <ImageDropzone location={loc} />
+              </div>
             </section>
-          )}
-        </div>
-      )}
 
-      <Dialog open={deleteOpen} onOpenChange={(open) => !deleting && setDeleteOpen(open)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete &ldquo;{loc?.name}&rdquo;?</DialogTitle>
-            <DialogDescription>
-              This permanently removes the location{loc?.model || loc?.images.length ? ' and its attached model/images' : ''}. This
-              cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {(loc.model || user?.role === 'ADMIN') && (
+              <section>
+                <h3 className="text-sm font-semibold">3D model</h3>
+                <ModelControls location={loc} onView={() => setModelOpen(true)} />
+              </section>
+            )}
+          </div>
+        )}
 
-      <ReportDialog
-        open={reportOpen}
-        onOpenChange={setReportOpen}
-        submitting={reportMutation.isPending}
-        targetLabel={loc?.name ?? 'location'}
-        onSubmit={reportMutation.mutate}
-      />
+        <Dialog open={deleteOpen} onOpenChange={(open) => !deleting && setDeleteOpen(open)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete &ldquo;{loc?.name}&rdquo;?</DialogTitle>
+              <DialogDescription>
+                This permanently removes the location{loc?.model || loc?.images.length ? ' and its attached model/images' : ''}. This
+                cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <ModelViewerDialog model={loc?.model ?? null} open={modelOpen} onOpenChange={setModelOpen} />
-    </aside>
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          submitting={reportMutation.isPending}
+          targetLabel={loc?.name ?? 'location'}
+          onSubmit={reportMutation.mutate}
+        />
+
+        <ModelViewerDialog model={loc?.model ?? null} open={modelOpen} onOpenChange={setModelOpen} />
+      </aside>
+    </TooltipProvider>
   )
 }
