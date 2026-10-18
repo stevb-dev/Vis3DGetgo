@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import BackToMapButton from '@/components/BackToMapButton'
 
 type ResolveAction = 'DELETE' | 'DISMISS'
 type StatusTab = 'OPEN' | 'CLOSED'
@@ -97,8 +98,11 @@ export default function AdminReportsPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Reports</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <BackToMapButton className="shrink-0" />
+          <h1 className="text-lg font-semibold">Reports</h1>
+        </div>
         <div className="flex rounded-md border p-0.5 text-sm">
           {(['OPEN', 'CLOSED'] as const).map((s) => (
             <button

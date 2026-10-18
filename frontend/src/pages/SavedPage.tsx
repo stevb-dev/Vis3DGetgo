@@ -7,6 +7,7 @@ import { LOCATION_CATEGORY_LABELS, LocationSummary } from '@/lib/types'
 import { buildShareUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import BackToMapButton from '@/components/BackToMapButton'
 
 export default function SavedPage() {
   const navigate = useNavigate()
@@ -38,7 +39,10 @@ export default function SavedPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
-      <h1 className="mb-4 text-lg font-semibold">Saved locations</h1>
+      <div className="mb-4 flex items-center gap-3">
+        <BackToMapButton className="shrink-0" />
+        <h1 className="text-lg font-semibold">Saved locations</h1>
+      </div>
 
       {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
 

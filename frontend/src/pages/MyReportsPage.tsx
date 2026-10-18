@@ -3,6 +3,7 @@ import { Inbox, MapPin } from 'lucide-react'
 import { api } from '@/lib/api'
 import { MyReport, REPORT_CATEGORY_LABELS, REPORT_STATUS_LABELS } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import BackToMapButton from '@/components/BackToMapButton'
 
 /**
  * Reporter's own reports (report-resolution/07): a plain list of the user's
@@ -24,7 +25,10 @@ export default function MyReportsPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
-      <h1 className="mb-4 text-lg font-semibold">My reports</h1>
+      <div className="mb-4 flex items-center gap-3">
+        <BackToMapButton className="shrink-0" />
+        <h1 className="text-lg font-semibold">My reports</h1>
+      </div>
 
       {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
 

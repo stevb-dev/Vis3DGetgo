@@ -1,5 +1,7 @@
-import { Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom'
 import Header from './components/Header'
+import { trackLocation } from './lib/locationHistory'
 import GuestRoute from './components/GuestRoute'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
@@ -15,6 +17,14 @@ import SavedPage from './pages/SavedPage'
 import SlugResolver from './components/SlugResolver'
 
 export default function App() {
+  // Record every navigation so BackToMapButton can inspect the previous entry
+  // (react-router does not expose it). App lives inside <BrowserRouter>.
+  const location = useLocation()
+  const navigationType = useNavigationType()
+  useEffect(() => {
+    trackLocation(location, navigationType)
+  }, [location, navigationType])
+
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <Header />

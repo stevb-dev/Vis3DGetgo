@@ -105,62 +105,64 @@ export default function ImageCarousel({ location, lightboxIndex, onLightboxIndex
             const canDelete = user !== null && (isAdmin || image.userId === user.id)
             const canReport = user !== null && image.userId !== user.id
             return (
-              <CarouselItem key={image.id} className="relative">
-                <img
-                  src={image.filePath}
-                  alt={`Photo ${index + 1} of ${location.name}`}
-                  loading="lazy"
-                  title="View larger"
-                  onClick={() => onLightboxIndexChange(index)}
-                  className="h-48 w-full cursor-zoom-in rounded-md border object-cover"
-                />
-                {isPinned && (
-                  <span className="absolute left-2 top-2 flex items-center gap-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                    <Star className="h-3 w-3 fill-current" /> Thumbnail
+              <CarouselItem key={image.id}>
+                <div className="relative">
+                  <img
+                    src={image.filePath}
+                    alt={`Photo ${index + 1} of ${location.name}`}
+                    loading="lazy"
+                    title="View larger"
+                    onClick={() => onLightboxIndexChange(index)}
+                    className="block aspect-square w-full cursor-zoom-in rounded-md border object-contain"
+                  />
+                  {isAdmin && isPinned && (
+                    <span className="absolute left-2 top-2 flex items-center gap-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      <Star className="h-3 w-3 fill-current" /> Thumbnail
+                    </span>
+                  )}
+                  <div className="absolute right-2 top-2 flex items-center gap-1">
+                    {isAdmin && (
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7"
+                        title={isPinned ? 'Unpin thumbnail' : 'Set as thumbnail'}
+                        aria-label={isPinned ? 'Unpin thumbnail' : 'Set as thumbnail'}
+                        disabled={pinMutation.isPending}
+                        onClick={() => pinMutation.mutate(isPinned ? null : image.id)}
+                      >
+                        {isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                      </Button>
+                    )}
+                    {canReport && (
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Report this image"
+                        aria-label="Report this image"
+                        onClick={() => setReportTarget(image)}
+                      >
+                        <Flag className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        title="Delete image"
+                        aria-label="Delete image"
+                        onClick={() => setDeleteTarget(image)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                  <span className="absolute bottom-2 right-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
+                    {index + 1} / {images.length}
                   </span>
-                )}
-                <div className="absolute right-2 top-2 flex items-center gap-1">
-                  {isAdmin && (
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-7 w-7"
-                      title={isPinned ? 'Unpin thumbnail' : 'Set as thumbnail'}
-                      aria-label={isPinned ? 'Unpin thumbnail' : 'Set as thumbnail'}
-                      disabled={pinMutation.isPending}
-                      onClick={() => pinMutation.mutate(isPinned ? null : image.id)}
-                    >
-                      {isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-                    </Button>
-                  )}
-                  {canReport && (
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="Report this image"
-                      aria-label="Report this image"
-                      onClick={() => setReportTarget(image)}
-                    >
-                      <Flag className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                  {canDelete && (
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      title="Delete image"
-                      aria-label="Delete image"
-                      onClick={() => setDeleteTarget(image)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
                 </div>
-                <span className="absolute bottom-2 right-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-                  {index + 1} / {images.length}
-                </span>
               </CarouselItem>
             )
           })}

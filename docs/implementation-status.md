@@ -346,7 +346,33 @@ discard prompt.
   Successful create → `/locations/:id` **without** `?fly=1` (no recenter) —
   the new pin is already under the view. `['locations']` invalidated.
 
-## 13. Bug ledger (root causes worth citing)
+## 13. Back-to-map navigation & carousel polish (2026-10-18)
+
+### Back-to-map button (grilling round, decisions via interactive questions)
+
+Full-page routes had no explicit way back to the map (only the header brand logo). Added a shared "Back to map" affordance:
+
+- **`components/BackToMapButton.tsx`**: outline `Button` (size `sm`) + lucide `ArrowLeft` + label "Back to map" (matches the sidebar error-state button wording). On click: `navigate(-1)` **only** when the previous in-app entry is the map (`/` or `/locations/…`), preserving its exact view state (viewport params included); otherwise `navigate('/')` — the button always lands on the map (direct visits, or previous entry = another list page / login).
+- **`lib/locationHistory.ts`**: module-level tracker mirroring browser history — `trackLocation(location, action)` keeps a `{ key, pathname }` stack (PUSH appends, REPLACE swaps the top, POP truncates to the matching entry or reseeds; idempotent for StrictMode's double effect), plus `getPreviousPathname()` and `isMapPath()`. react-router exposes no way to read the previous history entry, hence the tracker. Wired in `App.tsx` via `useLocation` + `useNavigationType` in a `useEffect` (App lives inside `BrowserRouter`).
+- **Pages**: `/saved`, `/my-reports` — button left of the h1 in the same row (`mb-4` moved to the row wrapper); `/admin/reports` — joins the existing h1 + Open/Closed tab-switch row (left group; tab switch stays right); `/login`, `/register` — above the centered card, left-aligned with the card width (container became `flex-col` + `gap-4`).
+- Grilled decisions: page-level next to the h1 (not in the global Header); one shared component, not per-page markup; no Escape-key support (button only); scope = the three list pages + login/register (not the slug resolver or map overlays, which already have close affordances).
+
+### Carousel polish (`components/ImageCarousel.tsx`)
+
+- Slides are **square**: `h-48 w-full` → `aspect-square w-full`.
+- **`object-contain`** (was `object-cover`): photos are never cropped — portrait photos render whole inside the square, letterboxed with side gutters (user chose this over an adaptive per-photo frame).
+- The amber **"Thumbnail" badge is admin-only** (`isAdmin && isPinned`); the pin/unpin controls were already admin-only.
+- **Overlay anchoring fix**: the badge / action buttons / photo counter were absolutely positioned against the slide element, which includes the embla `pl-4`/`-ml-4` gutter — the badge rendered left of (and on the first slide, clipped by) the photo frame. Overlays now anchor to a `relative` wrapper around the `<img>` (img made `block` so the wrapper hugs it exactly).
+
+### Concurrent (non-session) changes — do not claim
+
+`LocationSidebar.tsx`, the new `ui/tooltip.tsx`, and `package.json`/`package-lock.json` (`@radix-ui/react-tooltip`) are from a parallel session (sidebar action-row move + tooltips; logged in `.scratch/sidebar-redesign/issues/02`). A mid-edit state of that file caused a transient `tsc` failure during this session — re-running after the edit settled is green.
+
+### Verification
+
+Frontend `tsc --noEmit` green at session end. Pending: interactive browser pass (button behavior on all five pages, square/contain carousel, admin-only badge).
+
+## 14. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -368,17 +394,18 @@ discard prompt.
 | `/locations/new` crashed the whole page (cannot destructure 'picked' of `useOutletContext(...)` as undefined) | `useOutletContext` reads the *nearest* `<Outlet>` — the `ProtectedRoute` layout route rendered its own `<Outlet>` (no context) between MapPage's `<Outlet context>` and the create panel | `ProtectedRoute` guards inline (`children` passthrough; layout `<Outlet>` kept for the other routes) so no intermediate Outlet shadows the map's context |
 | SPZ viewer put the camera at the origin, inside the model | The gsplat component is **unified** by default, so `gsplat.instance` is `undefined` — the frame-fit read `instance.meshInstance.aabb`, always missed, and the fallback pose `(0,0,2.5)` sat inside any monument-scale splat | Read `gsplat.customAabb` (falls through to the resource's parse-time AABB); true viewport fit from fov/aspect at ~18° elevation |
 | SPZ viewer framed from ~kilometres away after the fix | The resource AABB includes scan strays — the monument's positions even saturate the SPZ 24-bit range (±2047, medians ~1–17) — so the circumsphere fit targeted garbage points | Frame on percentile-trimmed bounds: `robustFrameSphere` stride-samples `resource.centers` (≤250k) and frames a sphere of radius = p75 of distances from the per-axis median (box/quantile bounds still over-frame — the stray haze is radially diffuse). Backend outlier filtering is models-3d/05 |
+| Amber "Thumbnail" badge rendered left of the carousel photo frame (clipped off-screen on the first slide) | Badge (and the other slide overlays) were `absolute`-positioned against the slide element, whose box includes the embla `pl-4` slide gutter (offset by `-ml-4` on the content row) | Anchor all overlays to a `relative` wrapper around the `<img>` itself; make the img `block` so the wrapper hugs the photo frame |
 
-## 14. Remaining open work
+## 15. Remaining open work
 
 - `models-3d` (3/3): demo models seeded — but the Matka SPZ is a placeholder (Niantic raccoon sample); a real landscape splat remains a follow-up.
 - `frontend-map` (5/5, 2026-10-18): closed out — 02 skeleton + 404, 03 viewport persistence in the URL, 05 per-category pins (zoom half wontfix).
 - `create-location-flow` (3/3, 2026-10-18): nested route + panel + cancel; the authenticated click-through is pending.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only); the new category pins + viewport-in-URL + create flow also need a click-through.
+- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only); the new category pins + viewport-in-URL + create flow, plus the back-to-map button and the carousel polish (section 13), also need a click-through.
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 15. Doc map
+## 16. Doc map
 
 | Doc | Purpose |
 |---|---|
