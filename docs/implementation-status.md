@@ -238,8 +238,13 @@ on `format`, orbit-only controls.
   load failures are caught by an in-canvas `ErrorBoundary` (`components/ErrorBoundary.tsx`).
 - **SPZ** → the **PlayCanvas engine** (`playcanvas` npm): a `gsplat` entity loaded
   through the `SpzParser` script (SPZ **v4** only, ZSTD wasm decoder vendored in
-  `frontend/public/wasm/`), orbit-only `CameraControls`, camera frame-fit to the
-  splat's AABB. `@mkkellogg/gaussian-splats-3d` was **removed** (frozen at 0.4.7,
+  `frontend/public/wasm/`), orbit-only `CameraControls`. Camera frame-fit
+  (rewritten 2026-10-18, three rounds): frame on `robustFrameSphere` — a sphere
+  around the per-axis median of the stride-sampled dequantized centers
+  (`resource.centers`, ≤250k samples), radius = `FRAME_DISTANCE_QUANTILE` (0.25,
+  user-tuned) of the distances from that point; true viewport fit from fov/aspect
+  at ~18° elevation; fallback chain `customAabb` → `resource.aabb` → fixed pose.
+  `@mkkellogg/gaussian-splats-3d` was **removed** (frozen at 0.4.7,
   reads SPZ ≤ v2 — see the migration note below).
 - **Lazy**: `React.lazy` + `<Suspense>` — the viewer (three/drei + PlayCanvas)
   ships as its own ~2.9 MB chunk, off the critical path.
@@ -292,7 +297,9 @@ migrated to the **PlayCanvas engine** (`playcanvas` npm), which reads SPZ **v4**
 
 - `ModelViewer.tsx`'s SPZ path is now a PlayCanvas `Application` (canvas +
   camera + `CameraControls` script + `gsplat` entity), frame-fitting the camera
-  to the splat's bounding box. The GLB path (R3F) is unchanged.
+  to robust splat bounds (see the Viewer bullets above; rewritten 2026-10-18
+  after the first browser pass — the raw AABB over-framed by orders of
+  magnitude). The GLB path (R3F) is unchanged.
 - The `SpzParser` and `CameraControls` scripts import from
   `playcanvas/scripts/esm/…` (exported by the package); `types/playcanvas-scripts.d.ts`
   declares them.
