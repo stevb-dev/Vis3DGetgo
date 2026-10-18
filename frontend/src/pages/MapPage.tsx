@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { MapContainer, Marker, Tooltip, useMapEvents } from 'react-leaflet'
@@ -11,7 +11,7 @@ import CategoryFilter from '@/components/CategoryFilter'
 import SearchBox from '@/components/SearchBox'
 import TileLayerController from '@/components/TileLayerController'
 import TileLayerSwitcher from '@/components/TileLayerSwitcher'
-import { isLocationCategory, LocationSummary } from '@/lib/types'
+import { isLocationCategory, LocationCategory, LocationSummary } from '@/lib/types'
 import { DEFAULT_LAYER_ID, getLayer, isTileLayerId, type TileLayerId } from '@/lib/tileLayers'
 
 /** Below this zoom (no category selected) the map collapses to nothing. */
@@ -54,6 +54,14 @@ function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
   return null
 }
 
+/** In create mode, empty-map clicks pick a spot for the new location instead. */
+function CreateClickCatcher({ onPick }: { onPick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click: (e) => onPick(e.latlng.lat, e.latlng.lng),
+  })
+  return null
+}
+
 /** Track the live map zoom — the MapContainer `zoom` prop only applies on mount. */
 function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void }) {
   useMapEvents({
@@ -62,12 +70,22 @@ function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void })
   return null
 }
 
+/** The create panel's transient picked spot (not URL state — not deep-linkable). */
+export interface PickedSpot {
+  lat: number
+  lng: number
+}
+
 export default function MapPage() {
   const navigate = useNavigate()
   const center = useMapCenter()
 
+  // Create mode: the create panel (nested route /locations/new) must not be
+  // treated as a selected location — `useMatch('/locations/:id')` also matches
+  // it with id="new" (→ NaN). Guard everything on isCreateMode.
+  const isCreateMode = useMatch('/locations/new') !== null
   const match = useMatch('/locations/:id')
-  const selectedId = match ? Number(match.params.id) : null
+  const selectedId = !isCreateMode && match ? Number(match.params.id) : null
 
   const [searchParams, setSearchParams] = useSearchParams()
   const fly = searchParams.get('fly') === '1'
@@ -88,6 +106,20 @@ export default function MapPage() {
   const effectiveCenter = initialView.center ?? center
 
   const [zoom, setZoom] = useState(initialZoom)
+
+  // Transient create-mode state, owned here because the panel renders outside
+  // MapContainer (an <Outlet> sibling) while the picked marker renders inside
+  // it — the panel shares this via Outlet context.
+  const [picked, setPicked] = useState<PickedSpot | null>(null)
+  const [pickedCategory, setPickedCategory] = useState<LocationCategory>('MONUMENTS')
+
+  // Leaving create mode resets the picked spot so re-entering starts clean.
+  useEffect(() => {
+    if (!isCreateMode) {
+      setPicked(null)
+      setPickedCategory('MONUMENTS')
+    }
+  }, [isCreateMode])
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['locations'],
@@ -141,6 +173,13 @@ export default function MapPage() {
     )
   }
 
+  // Shared with the create panel through <Outlet context>. `navigateMap`
+  // gives cancel/post-create the same param-preserving navigation as the map.
+  const createContext = useMemo(
+    () => ({ picked, setPicked, setPickedCategory, navigateMap }),
+    [picked, navigateMap],
+  )
+
   function handleMarkerClick(locId: number) {
     // Clicking the already-selected marker toggles the sidebar closed.
     if (selectedId === locId) navigateMap('/')
@@ -166,48 +205,58 @@ export default function MapPage() {
           <Recenter center={effectiveCenter} flyTo={flyTarget} />
           <MapSizeFix />
           <ViewportPersist />
-          <MapClickHandler onMapClick={handleMapClick} />
+          {!isCreateMode && <MapClickHandler onMapClick={handleMapClick} />}
+          {isCreateMode && <CreateClickCatcher onPick={(lat, lng) => setPicked({ lat, lng })} />}
           <ZoomTracker onZoomChange={setZoom} />
           <LocateButton />
-          {visibleLocations?.map((loc) => {
-            const isSelected = selectedId === loc.id
-            return (
-              <Marker
-                key={loc.id}
-                position={[loc.latitude, loc.longitude]}
-                icon={createCategoryIcon(loc.category, isSelected)}
-                eventHandlers={{ click: () => handleMarkerClick(loc.id) }}
-              >
-                <Tooltip direction="top" offset={[0, -34]} opacity={1}>
-                  <div className="flex flex-col items-center gap-1">
-                    {loc.thumbnail && (
-                      <img
-                        src={loc.thumbnail.filePath}
-                        alt={loc.name}
-                        loading="lazy"
-                        className="h-24 w-32 rounded-md object-cover"
-                      />
-                    )}
-                    <span className="text-xs font-medium">{loc.name}</span>
-                  </div>
-                </Tooltip>
-              </Marker>
-            )
-          })}
+          {!isCreateMode &&
+            visibleLocations?.map((loc) => {
+              const isSelected = selectedId === loc.id
+              return (
+                <Marker
+                  key={loc.id}
+                  position={[loc.latitude, loc.longitude]}
+                  icon={createCategoryIcon(loc.category, isSelected)}
+                  eventHandlers={{ click: () => handleMarkerClick(loc.id) }}
+                >
+                  <Tooltip direction="top" offset={[0, -34]} opacity={1}>
+                    <div className="flex flex-col items-center gap-1">
+                      {loc.thumbnail && (
+                        <img
+                          src={loc.thumbnail.filePath}
+                          alt={loc.name}
+                          loading="lazy"
+                          className="h-24 w-32 rounded-md object-cover"
+                        />
+                      )}
+                      <span className="text-xs font-medium">{loc.name}</span>
+                    </div>
+                  </Tooltip>
+                </Marker>
+              )
+            })}
+          {/* Picked spot in create mode: the category pin follows the form's
+              category selection (grilling decision, 2026-10-18). */}
+          {isCreateMode && picked && (
+            <Marker
+              position={[picked.lat, picked.lng]}
+              icon={createCategoryIcon(pickedCategory, true)}
+            />
+          )}
         </MapContainer>
 
         {/* Search box (top-center, above the chips). */}
-        <SearchBox />
+        {!isCreateMode && <SearchBox />}
 
         {/* Category filter overlay (below the search box). */}
-        <CategoryFilter />
+        {!isCreateMode && <CategoryFilter />}
 
         {/* Tile layer switcher (bottom-left). */}
         <TileLayerSwitcher activeId={activeLayer.id} onSelect={selectLayer} />
 
         {/* Empty state: no markers visible (below the gate with no filter, or an
             empty category). Non-interactive so pan/zoom still work. */}
-        {noVisibleMarkers && (
+        {!isCreateMode && noVisibleMarkers && (
           <div className="pointer-events-none absolute inset-x-0 bottom-6 z-[1000] flex justify-center">
             <p className="rounded-md bg-background/80 px-3 py-1.5 text-sm text-muted-foreground shadow">
               No locations here — pick a category or zoom in
@@ -229,8 +278,9 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* Location detail renders here as a sidebar at /locations/:id. */}
-      <Outlet />
+      {/* Location detail renders here as a sidebar at /locations/:id; the
+          create panel at /locations/new (create-location-flow). */}
+      <Outlet context={createContext} />
     </div>
   )
 }

@@ -4,11 +4,11 @@ import GuestRoute from './components/GuestRoute'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import LocationSidebar from './components/LocationSidebar'
+import CreateLocationPanel from './components/CreateLocationPanel'
 import { Toaster } from './components/ui/sonner'
 import MapPage from './pages/MapPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
-import CreateLocationPage from './pages/CreateLocationPage'
 import AdminReportsPage from './pages/AdminReportsPage'
 import MyReportsPage from './pages/MyReportsPage'
 import SavedPage from './pages/SavedPage'
@@ -25,7 +25,6 @@ export default function App() {
         </Route>
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/locations/new" element={<CreateLocationPage />} />
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/my-reports" element={<MyReportsPage />} />
         </Route>
@@ -37,8 +36,14 @@ export default function App() {
         {/* Share-slug alias: resolves coords → canonical /locations/:id. */}
         <Route path="/locations/:slug/:coords" element={<SlugResolver />} />
 
-        {/* Map stays mounted; the location detail renders as a sidebar. */}
+        {/* Map stays mounted; the location detail renders as a sidebar and the
+            create flow as a panel (create-location-flow: the create route is
+            nested so entering/leaving it never remounts the map). The static
+            "locations/new" segment ranks above the dynamic "locations/:id". */}
         <Route path="/" element={<MapPage />}>
+          <Route element={<ProtectedRoute />}>
+            <Route path="locations/new" element={<CreateLocationPanel />} />
+          </Route>
           <Route path="locations/:id" element={<LocationSidebar />} />
         </Route>
       </Routes>
