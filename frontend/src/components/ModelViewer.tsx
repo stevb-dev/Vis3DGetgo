@@ -122,18 +122,22 @@ function GlbModel({ url, onProgress, onReady }: {
 
 /** Keep the percentile pass under this many sampled points (sort cost). */
 const MAX_FRAME_SAMPLES = 250_000
-/** Trim this fraction from each end of every axis (0.1% → p0.1–p99.9). */
-const FRAME_QUANTILE = 0.001
+/** Frame sphere radius = this quantile of distances from the median point. */
+const FRAME_DISTANCE_QUANTILE = 0.75
 
 /**
- * Outlier-robust bounds for the initial camera frame. Real scans carry
- * stragglers far from the subject (the demo monument's positions even saturate
- * the SPZ 24-bit range at ±2047), so the resource AABB over-frames by orders
- * of magnitude. This strides through the dequantized splat centers (at most
- * MAX_FRAME_SAMPLES), sorts per axis and takes the FRAME_QUANTILE..1−q range.
- * Returns null when the data is absent or degenerate.
+ * Outlier-robust frame for the initial camera pose. Real scans are radially
+ * diffuse — the demo monument's positions even saturate the SPZ 24-bit range
+ * (±2047) while half the mass sits within ~80 units of the median — so
+ * box-shaped bounds (resource AABB or per-axis quantiles) over-frame by
+ * orders of magnitude. This strides through the dequantized splat centers
+ * (at most MAX_FRAME_SAMPLES), takes the per-axis median point, and returns a
+ * sphere whose radius is the FRAME_DISTANCE_QUANTILE of the sample distances
+ * from that point. Returns null when the data is absent or degenerate.
  */
-function robustFrameBounds(centers: Float32Array | undefined): pc.BoundingBox | null {
+function robustFrameSphere(
+  centers: Float32Array | undefined,
+): { center: pc.Vec3; radius: number } | null {
   if (!centers || centers.length < 6) return null
   const count = centers.length / 3
   const stride = Math.max(1, Math.floor(count / MAX_FRAME_SAMPLES))
@@ -147,14 +151,21 @@ function robustFrameBounds(centers: Float32Array | undefined): pc.BoundingBox | 
     zs[s] = centers[i * 3 + 2]
   }
   // TypedArray#sort is numeric (unlike Array#sort's string compare).
-  xs.sort()
-  ys.sort()
-  zs.sort()
-  const lo = Math.min(sampleCount - 1, Math.floor(sampleCount * FRAME_QUANTILE))
-  const hi = Math.max(lo, sampleCount - 1 - Math.floor(sampleCount * FRAME_QUANTILE))
-  const box = new pc.BoundingBox()
-  box.setMinMax(new pc.Vec3(xs[lo], ys[lo], zs[lo]), new pc.Vec3(xs[hi], ys[hi], zs[hi]))
-  return box.halfExtents.length() > 0 ? box : null
+  const median = new pc.Vec3(
+    Float32Array.from(xs).sort()[sampleCount >> 1],
+    Float32Array.from(ys).sort()[sampleCount >> 1],
+    Float32Array.from(zs).sort()[sampleCount >> 1],
+  )
+  const dists = new Float32Array(sampleCount)
+  for (let s = 0; s < sampleCount; s++) {
+    const dx = xs[s] - median.x
+    const dy = ys[s] - median.y
+    const dz = zs[s] - median.z
+    dists[s] = Math.sqrt(dx * dx + dy * dy + dz * dz)
+  }
+  dists.sort()
+  const radius = dists[Math.min(sampleCount - 1, Math.floor(sampleCount * FRAME_DISTANCE_QUANTILE))]
+  return radius > 0 ? { center: median, radius } : null
 }
 
 function SplatViewer({ url }: { url: string }) {
@@ -211,17 +222,23 @@ function SplatViewer({ url }: { url: string }) {
 
       // Frame the camera on robust bounds. The gsplat component is "unified"
       // by default, so `gsplat.instance` is undefined; bounds come from the
-      // dequantized centers (percentile-trimmed — scan strays inflate the raw
-      // AABB by orders of magnitude), falling back to customAabb → the
-      // resource's parse-time AABB. A degenerate AABB counts as missing.
+      // dequantized centers (distance-percentile sphere — box bounds over-frame
+      // radially diffuse scans), falling back to customAabb → the resource's
+      // parse-time AABB. A degenerate result counts as missing.
       const resource = asset.resource as
         | { centers?: Float32Array; aabb?: pc.BoundingBox }
         | null
         | undefined
-      const aabb = robustFrameBounds(resource?.centers) ?? gsplat?.customAabb ?? resource?.aabb ?? null
-      const radius = aabb ? aabb.halfExtents.length() : 0
-      const center = aabb && radius > 0 ? aabb.center.clone() : new pc.Vec3()
-      if (aabb && radius > 0) {
+      const frame = robustFrameSphere(resource?.centers)
+      const aabb = gsplat?.customAabb ?? resource?.aabb ?? null
+      const fallbackRadius = aabb ? aabb.halfExtents.length() : 0
+      const center = frame
+        ? frame.center
+        : aabb && fallbackRadius > 0
+          ? aabb.center.clone()
+          : new pc.Vec3()
+      const radius = frame ? frame.radius : fallbackRadius
+      if (radius > 0) {
         // True fit: distance that keeps the bounding sphere inside the
         // viewport, limited by the tighter of the vertical fov and the
         // aspect-scaled horizontal fov, with a small margin. Slight elevation
