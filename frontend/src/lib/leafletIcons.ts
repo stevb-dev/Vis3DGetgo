@@ -16,15 +16,3 @@ export const defaultIcon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 })
-
-/** Same marker, recolored via CSS (see .marker-selected in index.css). */
-export const selectedIcon = L.icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-  className: 'marker-selected',
-})

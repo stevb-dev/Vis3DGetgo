@@ -3,9 +3,9 @@ import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom
 import { useQuery } from '@tanstack/react-query'
 import { MapContainer, Marker, Tooltip, useMapEvents } from 'react-leaflet'
 import { api } from '@/lib/api'
-import { defaultIcon, selectedIcon } from '@/lib/leafletIcons'
+import { createCategoryIcon } from '@/lib/markerIcons'
 import { useMapCenter } from '@/hooks/useMapCenter'
-import { MapSizeFix, Recenter } from '@/components/mapEffects'
+import { MapSizeFix, Recenter, ViewportPersist } from '@/components/mapEffects'
 import LocateButton from '@/components/LocateButton'
 import CategoryFilter from '@/components/CategoryFilter'
 import SearchBox from '@/components/SearchBox'
@@ -16,6 +16,37 @@ import { DEFAULT_LAYER_ID, getLayer, isTileLayerId, type TileLayerId } from '@/l
 
 /** Below this zoom (no category selected) the map collapses to nothing. */
 const ZOOM_GATE = 12
+
+/**
+ * Read a numeric query param; missing, empty or non-numeric → null. (Naive
+ * `Number(params.get(k))` turns an absent param into 0 — null island, not an
+ * error — which silently overrode the geolocation start.)
+ */
+function readNumberParam(params: URLSearchParams, key: string): number | null {
+  const raw = params.get(key)
+  if (raw === null || raw.trim() === '') return null
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : null
+}
+
+/**
+ * Parse the persisted viewport (`?lat=&lng=&zoom=`) for the map's initial
+ * position. Invalid or out-of-range values are ignored piece-wise so the
+ * geolocation fallback still applies for whatever is missing.
+ */
+function parseViewport(params: URLSearchParams): { center?: [number, number]; zoom?: number } {
+  const lat = readNumberParam(params, 'lat')
+  const lng = readNumberParam(params, 'lng')
+  const zoom = readNumberParam(params, 'zoom')
+  const view: { center?: [number, number]; zoom?: number } = {}
+  if (lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+    view.center = [lat, lng]
+  }
+  if (zoom !== null && zoom >= 2 && zoom <= 19) {
+    view.zoom = zoom
+  }
+  return view
+}
 
 /** Empty-map clicks close the sidebar (Leaflet doesn't fire this after a drag). */
 function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
@@ -47,7 +78,16 @@ export default function MapPage() {
   const rawLayer = searchParams.get('layer')
   const activeLayer = getLayer(isTileLayerId(rawLayer) ? rawLayer : DEFAULT_LAYER_ID)
 
-  const [zoom, setZoom] = useState(13)
+  // Persisted viewport read once for the map's initial position. A URL
+  // viewport wins over geolocation (same source-of-truth rule); absent or
+  // invalid, the geolocation → Skopje fallback applies as before.
+  const [initialView] = useState(() => parseViewport(searchParams))
+  const initialZoom = initialView.zoom ?? 13
+  // Effective center: the URL viewport (when present) is authoritative, so a
+  // late geolocation resolve can't yank the map off the restored view.
+  const effectiveCenter = initialView.center ?? center
+
+  const [zoom, setZoom] = useState(initialZoom)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['locations'],
@@ -74,12 +114,17 @@ export default function MapPage() {
     [fly, selected?.latitude, selected?.longitude],
   )
 
-  // Preserve the active category filter + tile layer across navigation. The
-  // transient `fly` hint is deliberately dropped — carrying it would re-center.
+  // Preserve the active category filter + tile layer + viewport across
+  // navigation. The transient `fly` hint is deliberately dropped — carrying
+  // it would re-center.
   function navigateMap(path: string) {
     const params = new URLSearchParams()
     if (activeCategory) params.set('category', activeCategory)
     if (activeLayer.id !== DEFAULT_LAYER_ID) params.set('layer', activeLayer.id)
+    for (const key of ['lat', 'lng', 'zoom']) {
+      const value = searchParams.get(key)
+      if (value) params.set(key, value)
+    }
     const s = params.toString()
     navigate(s ? `${path}?${s}` : path)
   }
@@ -112,14 +157,15 @@ export default function MapPage() {
           the sidebar shrinks the map (rather than centering over the full row). */}
       <div className="relative min-w-0 flex-1">
         <MapContainer
-          center={center}
-          zoom={13}
+          center={effectiveCenter}
+          zoom={initialZoom}
           scrollWheelZoom
           className="h-[calc(100vh-3.5rem)] w-full"
         >
           <TileLayerController layer={activeLayer} />
-          <Recenter center={center} flyTo={flyTarget} />
+          <Recenter center={effectiveCenter} flyTo={flyTarget} />
           <MapSizeFix />
+          <ViewportPersist />
           <MapClickHandler onMapClick={handleMapClick} />
           <ZoomTracker onZoomChange={setZoom} />
           <LocateButton />
@@ -129,7 +175,7 @@ export default function MapPage() {
               <Marker
                 key={loc.id}
                 position={[loc.latitude, loc.longitude]}
-                icon={isSelected ? selectedIcon : defaultIcon}
+                icon={createCategoryIcon(loc.category, isSelected)}
                 eventHandlers={{ click: () => handleMarkerClick(loc.id) }}
               >
                 <Tooltip direction="top" offset={[0, -34]} opacity={1}>

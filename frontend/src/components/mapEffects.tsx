@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useMap } from 'react-leaflet'
 
 /**
@@ -37,5 +37,41 @@ export function MapSizeFix() {
   useEffect(() => {
     map.invalidateSize()
   }, [location.pathname, map])
+  return null
+}
+
+/**
+ * Keep the live viewport in the URL (`?lat=&lng=&zoom=`) so a full reload
+ * restores the last view (ADR-0002: URL as the source of truth). Written on
+ * move/zoom end with `replace` so panning doesn't spam the history; the
+ * initial setView writes the starting viewport once, which is harmless.
+ */
+export function ViewportPersist() {
+  const map = useMap()
+  const [, setSearchParams] = useSearchParams()
+
+  useEffect(() => {
+    const write = () => {
+      const c = map.getCenter()
+      const z = map.getZoom()
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('lat', c.lat.toFixed(5))
+          next.set('lng', c.lng.toFixed(5))
+          next.set('zoom', z.toFixed(2))
+          return next
+        },
+        { replace: true },
+      )
+    }
+    map.on('moveend', write)
+    map.on('zoomend', write)
+    return () => {
+      map.off('moveend', write)
+      map.off('zoomend', write)
+    }
+  }, [map, setSearchParams])
+
   return null
 }

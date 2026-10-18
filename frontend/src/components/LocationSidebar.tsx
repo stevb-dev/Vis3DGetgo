@@ -286,11 +286,44 @@ export default function LocationSidebar() {
         </div>
       </div>
 
-      {isLoading && <div className="p-4 text-sm text-muted-foreground">Loading…</div>}
+      {/* Loading skeleton: mirrors the sidebar's sections (header, meta,
+          images, 3D model) so the layout doesn't jump when data arrives. */}
+      {isLoading && (
+        <div className="animate-pulse space-y-5 p-4" aria-busy="true">
+          <div className="space-y-2">
+            <div className="h-4 w-2/3 rounded bg-muted" />
+            <div className="h-3 w-full rounded bg-muted" />
+            <div className="h-3 w-4/5 rounded bg-muted" />
+          </div>
+          <div className="h-6 w-24 rounded-md bg-muted" />
+          <div className="space-y-2">
+            <div className="h-3.5 w-16 rounded bg-muted" />
+            <div className="h-40 w-full rounded-md bg-muted" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-3.5 w-20 rounded bg-muted" />
+            <div className="h-16 w-full rounded-md bg-muted" />
+          </div>
+        </div>
+      )}
 
       {isError && (
-        <div className="p-4 text-sm text-muted-foreground">
-          {error instanceof ApiError ? error.message : 'Location not found'}
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-sm font-semibold">
+            {error instanceof ApiError && error.status === 404
+              ? 'Location not found'
+              : 'Could not load this location'}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {error instanceof ApiError && error.status === 404
+              ? 'It may have been removed, or the link is wrong.'
+              : error instanceof ApiError
+                ? error.message
+                : 'Something went wrong. Please try again.'}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => navigate('/')}>
+            Back to map
+          </Button>
         </div>
       )}
 
