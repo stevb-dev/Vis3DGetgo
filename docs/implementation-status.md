@@ -2,7 +2,7 @@
 
 Session log of everything built so far — what is implemented, how it was verified, and what remains open. The thesis can cite this file directly as a build log.
 
-> Last updated: 2026-10-18 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
+> Last updated: 2026-10-19 · Stack running locally: `http://localhost` (SPA), `:3000` (API), `:5432` (PostGIS)
 
 ---
 
@@ -319,7 +319,7 @@ Grilling-round design (2026-10-15): the create flow nests under the map so the
 viewport never resets, with a side-panel form, explicit cancel, and a
 discard prompt.
 
-- **Nested route** (`App.tsx`): `/locations/new` is a child of the `/` map
+- **Nested route** (`routes.tsx`): `/locations/new` is a child of the `/` map
   route, wrapped in `ProtectedRoute` (guests still redirect to login). The
   static segment ranks above `locations/:id`. `CreateLocationPage` (own
   `MapContainer` — the viewport-reset root cause) is deleted; the flow is
@@ -372,7 +372,29 @@ Full-page routes had no explicit way back to the map (only the header brand logo
 
 Frontend `tsc --noEmit` green at session end. Pending: interactive browser pass (button behavior on all five pages, square/contain carousel, admin-only badge).
 
-## 14. Bug ledger (root causes worth citing)
+## 14. Map bugfixes — fly-recenter & bare /locations (2026-10-19)
+
+Two user-reported map bugs, fixed TDD-style with the frontend's first tests.
+
+### Fly-recenter bug (`.scratch/frontend-map/issues/06`)
+
+- **Symptom**: search for a location → select → map flies there; clicking any other pin then yanks the map to the user's geolocation (their home — "Borce Stan").
+- **Root cause**: `Recenter` (`components/mapEffects.tsx`) fell back to `setView(mount-time center)` whenever `flyTo` cleared. Marker clicks deliberately drop the transient `?fly=1`, so the first pin click after a fly re-centered to the frozen mount-time center.
+- **Fix**: `hasFlown` ref — after the first fly, clearing the target leaves the map in place; a late geolocation resolve still recenters when no fly ever happened, and an active fly still beats a late center change.
+
+### Bare /locations blank page (`.scratch/frontend-map/issues/07`)
+
+- **Symptom**: `/locations` with no params (typed URL, trimmed share link) rendered a blank content area.
+- **Root cause**: no route matched the bare path — map URLs are `/` and `/locations/:id|new` plus the two-segment share slug; `<Routes>` rendered nothing. Query params don't participate in matching.
+- **Fix**: route tree extracted to `src/routes.tsx` (`appRoutes` export — rendered unchanged, but testable via `matchRoutes` and Fast-Refresh-friendly) + `<Route path="/locations" element={<Navigate to="/" replace />} />`.
+
+### Frontend test infra (first tests)
+
+- vitest + @testing-library/react + jsdom devDeps, `npm test` script, `jsdom` env in `vite.config.ts`.
+- `components/mapEffects.test.tsx`: mocked `useMap` call-sequence tests — red on the old `setView`-after-fly behavior, green on the `hasFlown` guard.
+- `App.test.tsx`: route coverage at the matching seam — `createRoutesFromChildren(appRoutes)` + `matchRoutes` asserts `/locations` matches (red before the redirect) plus `/`, `/locations/:id`, `/locations/new`.
+
+## 15. Bug ledger (root causes worth citing)
 
 | Symptom | Root cause | Fix |
 |---|---|---|
@@ -395,17 +417,19 @@ Frontend `tsc --noEmit` green at session end. Pending: interactive browser pass 
 | SPZ viewer put the camera at the origin, inside the model | The gsplat component is **unified** by default, so `gsplat.instance` is `undefined` — the frame-fit read `instance.meshInstance.aabb`, always missed, and the fallback pose `(0,0,2.5)` sat inside any monument-scale splat | Read `gsplat.customAabb` (falls through to the resource's parse-time AABB); true viewport fit from fov/aspect at ~18° elevation |
 | SPZ viewer framed from ~kilometres away after the fix | The resource AABB includes scan strays — the monument's positions even saturate the SPZ 24-bit range (±2047, medians ~1–17) — so the circumsphere fit targeted garbage points | Frame on percentile-trimmed bounds: `robustFrameSphere` stride-samples `resource.centers` (≤250k) and frames a sphere of radius = p75 of distances from the per-axis median (box/quantile bounds still over-frame — the stray haze is radially diffuse). Backend outlier filtering is models-3d/05 |
 | Amber "Thumbnail" badge rendered left of the carousel photo frame (clipped off-screen on the first slide) | Badge (and the other slide overlays) were `absolute`-positioned against the slide element, whose box includes the embla `pl-4` slide gutter (offset by `-ml-4` on the content row) | Anchor all overlays to a `relative` wrapper around the `<img>` itself; make the img `block` so the wrapper hugs the photo frame |
+| Clicking a pin after a search fly recentered the map to the user's home ("Borce Stan") | `Recenter` fell back to `setView(mount-time center)` whenever the fly target cleared — marker clicks deliberately drop `?fly=1` (spec: no recenter), so the first pin click after a fly re-centered to the frozen mount-time center (geolocation) | `hasFlown` ref in `Recenter`: the `setView(center)` fallback only applies before the first fly |
+| Bare `/locations` rendered a blank page | No route matched the bare path (map URLs are only `/` and `/locations/:id\|new` + the two-segment share slug), so `<Routes>` rendered nothing — query params don't affect matching | Route tree extracted to `src/routes.tsx`; `<Route path="/locations" element={<Navigate to="/" replace />} />` |
 
-## 15. Remaining open work
+## 16. Remaining open work
 
 - `models-3d` (3/3): demo models seeded — but the Matka SPZ is a placeholder (Niantic raccoon sample); a real landscape splat remains a follow-up.
-- `frontend-map` (5/5, 2026-10-18): closed out — 02 skeleton + 404, 03 viewport persistence in the URL, 05 per-category pins (zoom half wontfix).
+- `frontend-map` (7/7, 2026-10-19): closed out — 02 skeleton + 404, 03 viewport persistence in the URL, 05 per-category pins (zoom half wontfix), 06 search-fly recenter fix, 07 bare `/locations` redirect.
 - `create-location-flow` (3/3, 2026-10-18): nested route + panel + cancel; the authenticated click-through is pending.
 - `deployment` (0/2): prod runbook (`docs/deployment.md`), backup rotation docs.
-- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only); the new category pins + viewport-in-URL + create flow, plus the back-to-map button and the carousel polish (section 13), also need a click-through.
+- Interactive browser pass: search, tile-layers, map-filters, sidebar-redesign, images UI, report-resolution, 3D viewer (build-verified only); the new category pins + viewport-in-URL + create flow, plus the back-to-map button and the carousel polish (section 13) and the fly-recenter + bare-`/locations` fixes (section 14), also need a click-through.
 - Known residuals (documented in tickets): server-side grace period for just-rotated refresh tokens; tile caching for fully offline deployments.
 
-## 16. Doc map
+## 17. Doc map
 
 | Doc | Purpose |
 |---|---|
