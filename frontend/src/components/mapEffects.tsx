@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { useMap } from 'react-leaflet'
 
@@ -7,6 +7,11 @@ import { useMap } from 'react-leaflet'
  * late-arriving position (geolocation) needs an explicit setView. When a
  * `flyTo` target is present (external entry via ?fly=1) it wins over the
  * initial center, so a slow geolocation resolve can't undo the fly.
+ *
+ * Once a fly has happened, clearing the target (marker click, sidebar close,
+ * …) must NOT re-center: `navigateMap` deliberately drops the transient
+ * `?fly=1`, and falling back to `setView(center)` there would yank the map
+ * back to the mount-time center (geolocation home) instead of staying put.
  */
 export function Recenter({
   center,
@@ -16,10 +21,12 @@ export function Recenter({
   flyTo?: [number, number] | null
 }) {
   const map = useMap()
+  const hasFlown = useRef(false)
   useEffect(() => {
     if (flyTo) {
+      hasFlown.current = true
       map.flyTo(flyTo, 15, { duration: 0.8 })
-    } else {
+    } else if (!hasFlown.current) {
       map.setView(center)
     }
   }, [center, flyTo, map])
