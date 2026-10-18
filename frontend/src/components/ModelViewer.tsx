@@ -120,6 +120,43 @@ function GlbModel({ url, onProgress, onReady }: {
   return <primitive object={gltf.scene} />
 }
 
+/** Keep the percentile pass under this many sampled points (sort cost). */
+const MAX_FRAME_SAMPLES = 250_000
+/** Trim this fraction from each end of every axis (0.1% → p0.1–p99.9). */
+const FRAME_QUANTILE = 0.001
+
+/**
+ * Outlier-robust bounds for the initial camera frame. Real scans carry
+ * stragglers far from the subject (the demo monument's positions even saturate
+ * the SPZ 24-bit range at ±2047), so the resource AABB over-frames by orders
+ * of magnitude. This strides through the dequantized splat centers (at most
+ * MAX_FRAME_SAMPLES), sorts per axis and takes the FRAME_QUANTILE..1−q range.
+ * Returns null when the data is absent or degenerate.
+ */
+function robustFrameBounds(centers: Float32Array | undefined): pc.BoundingBox | null {
+  if (!centers || centers.length < 6) return null
+  const count = centers.length / 3
+  const stride = Math.max(1, Math.floor(count / MAX_FRAME_SAMPLES))
+  const sampleCount = Math.ceil(count / stride)
+  const xs = new Float32Array(sampleCount)
+  const ys = new Float32Array(sampleCount)
+  const zs = new Float32Array(sampleCount)
+  for (let i = 0, s = 0; i < count; i += stride, s++) {
+    xs[s] = centers[i * 3]
+    ys[s] = centers[i * 3 + 1]
+    zs[s] = centers[i * 3 + 2]
+  }
+  // TypedArray#sort is numeric (unlike Array#sort's string compare).
+  xs.sort()
+  ys.sort()
+  zs.sort()
+  const lo = Math.min(sampleCount - 1, Math.floor(sampleCount * FRAME_QUANTILE))
+  const hi = Math.max(lo, sampleCount - 1 - Math.floor(sampleCount * FRAME_QUANTILE))
+  const box = new pc.BoundingBox()
+  box.setMinMax(new pc.Vec3(xs[lo], ys[lo], zs[lo]), new pc.Vec3(xs[hi], ys[hi], zs[hi]))
+  return box.halfExtents.length() > 0 ? box : null
+}
+
 function SplatViewer({ url }: { url: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
@@ -172,12 +209,16 @@ function SplatViewer({ url }: { url: string }) {
       camera.addComponent('camera', { clearColor: new pc.Color(0.08, 0.08, 0.1) })
       app.root.addChild(camera)
 
-      // Frame the camera on the splat's AABB. The gsplat component is
-      // "unified" by default, so `gsplat.instance` is undefined — the bounds
-      // must come from `customAabb` (falls through to the resource's
-      // parse-time AABB). A degenerate AABB counts as missing.
-      const aabb =
-        gsplat?.customAabb ?? (asset.resource as { aabb?: pc.BoundingBox } | null)?.aabb ?? null
+      // Frame the camera on robust bounds. The gsplat component is "unified"
+      // by default, so `gsplat.instance` is undefined; bounds come from the
+      // dequantized centers (percentile-trimmed — scan strays inflate the raw
+      // AABB by orders of magnitude), falling back to customAabb → the
+      // resource's parse-time AABB. A degenerate AABB counts as missing.
+      const resource = asset.resource as
+        | { centers?: Float32Array; aabb?: pc.BoundingBox }
+        | null
+        | undefined
+      const aabb = robustFrameBounds(resource?.centers) ?? gsplat?.customAabb ?? resource?.aabb ?? null
       const radius = aabb ? aabb.halfExtents.length() : 0
       const center = aabb && radius > 0 ? aabb.center.clone() : new pc.Vec3()
       if (aabb && radius > 0) {
